@@ -16,10 +16,10 @@ class AgentDefinition:
 
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage
 from src.config import create_llm
-from src.tools import TOOL_REGISTRY, get_tool_by_names
+from src.tools import TOOL_REGISTRY, get_tools_by_name
 
 def run_agent(defn:AgentDefinition, user_text:str) -> str:
-    tools = get_tool_by_names(defn.tool_names)
+    tools = get_tools_by_name(defn.tool_names)
     llm_with_tools = create_llm(defn.model).bind_tools(tools)
 
     messages = [SystemMessage(defn.system_prompt), HumanMessage(user_text)]

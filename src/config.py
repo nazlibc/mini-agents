@@ -4,7 +4,7 @@ from langchain_openai import ChatOpenAI
 load_dotenv() # reads .env → environment variables. Runs once, at import.
 
 def create_llm(model:str = "gpt-4o-mini"):
-    return ChatOpenAI(model_name=model, temperature=0)
+    return ChatOpenAI(model=model, temperature=0)
 
 # temperature=0 makes answers near-deterministic — easier to debug while learning.
 # This function is the only place in the whole project that knows which provider you use. 
