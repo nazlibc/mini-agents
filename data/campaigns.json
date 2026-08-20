@@ -1,0 +1,5 @@
+[
+  {"id": "C001", "name": "Summer Stamps",   "weeks": 12, "participation_rate": 0.31, "avg_weekly_spend": 24.50},
+  {"id": "C002", "name": "Back to School",  "weeks": 8,  "participation_rate": 0.22, "avg_weekly_spend": 31.00},
+  {"id": "C003", "name": "Winter Loyalty",  "weeks": 16, "participation_rate": 0.41, "avg_weekly_spend": 19.75}
+]
