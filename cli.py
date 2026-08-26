@@ -19,11 +19,29 @@ ANALYST = AgentDefinition(
 # “What's the participation of Winter Loyalty?” — watch it chain list_campaigns → get_campaign_stats, because you gave it a name, not an id. Nobody programmed that chain — that's the loop + good docstrings.
 # “What would 4 more weeks do to it?” — note it fails to remember context! Each run_agent call starts fresh. Sessions come later — for now, ask it in one sentence.
 
-agent = BaseAgent(ANALYST)
+# agent = BaseAgent(ANALYST)
+# while True:
+#     q = input("\nyou> ")
+#     if q in ("q", "exit"): break
+#     for kind, data in agent.stream_chat(q):
+#         if kind == "tool_call":
+#             print(f"  → {data['name']}({data['args']})")
+#         elif kind == "response":
+#             print("bot>", data)
+
+
+from src.agents.registry import get_agent
+from src.agents.router import classify_agent
+
+current = None
+
 while True:
     q = input("\nyou> ")
     if q in ("q", "exit"): break
-    for kind, data in agent.stream_chat(q):
+
+    current = classify_agent(q, previous_agent_id=  current)
+    print(f"→ routing to {current}")
+    for kind, data in get_agent(current).stream_chat(q):
         if kind == "tool_call":
             print(f"  → {data['name']}({data['args']})")
         elif kind == "response":
