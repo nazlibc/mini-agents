@@ -3,7 +3,7 @@ from src.agents.base import AgentDefinition
 ANALYST = AgentDefinition(
     agent_id="A01",
     name="Campaign Analyst",
-    description="Answers questions about campaign performance and forecasts.",
+    description="Answers questions about campaign performance. It never performs forecasts, only looks up real data.",
     system_prompt="You are a concise loyalty-campaign analyst. "
                 "Use your tools to look up real data before answering.",
     tool_names=["list_campaigns", "get_campaign_stats", ],
@@ -31,9 +31,9 @@ AGENT_DEFINITIONS = {
     d.agent_id: d for d in [ANALYST, FORECASTER, GENERAL]
 }
 
-"Note the tool subsets: the analyst can't forecast, the forecaster can't fetch stats. "
-"That's deliberate — it makes routing mistakes visible (the wrong agent will say it can't help), "
-"which is how you'll debug your descriptions."
+# "Note the tool subsets: the analyst can't forecast, the forecaster can't fetch stats. "
+# "That's deliberate — it makes routing mistakes visible (the wrong agent will say it can't help), "
+# "which is how you'll debug your descriptions."
 
 # go The registry — definitions become live agents, in src/agents/registry.py, 
 # which is imported by the router. The router doesn't care about the definitions themselves, 
