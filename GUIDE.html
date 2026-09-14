@@ -1,0 +1,1806 @@
+<title>mini-agents — Guided Build Course</title>
+<style>
+  :root {
+    --bg: #f7f9f9;
+    --panel: #ffffff;
+    --ink: #1c2528;
+    --ink-soft: #4d5c61;
+    --ink-faint: #7e8d92;
+    --line: #dde5e6;
+    --accent: #0e7570;
+    --accent-soft: #e2f0ef;
+    --amber: #a05a0a;
+    --amber-soft: #f6ecdd;
+    --code-bg: #14201f;
+    --code-ink: #d4e4e2;
+    --code-accent: #7fd6c8;
+    --done: #3d7a46;
+    --shadow: 0 1px 2px rgba(28,37,40,.05), 0 4px 14px rgba(28,37,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101819;
+      --panel: #172122;
+      --ink: #e3ecec;
+      --ink-soft: #a7b7b8;
+      --ink-faint: #6f8081;
+      --line: #263334;
+      --accent: #4cc3b6;
+      --accent-soft: #12302e;
+      --amber: #e0a45c;
+      --amber-soft: #33260f;
+      --code-bg: #0b1414;
+      --code-ink: #cfe0de;
+      --code-accent: #6fcabd;
+      --done: #7dbb86;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101819;
+    --panel: #172122;
+    --ink: #e3ecec;
+    --ink-soft: #a7b7b8;
+    --ink-faint: #6f8081;
+    --line: #263334;
+    --accent: #4cc3b6;
+    --accent-soft: #12302e;
+    --amber: #e0a45c;
+    --amber-soft: #33260f;
+    --code-bg: #0b1414;
+    --code-ink: #cfe0de;
+    --code-accent: #6fcabd;
+    --done: #7dbb86;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f9f9;
+    --panel: #ffffff;
+    --ink: #1c2528;
+    --ink-soft: #4d5c61;
+    --ink-faint: #7e8d92;
+    --line: #dde5e6;
+    --accent: #0e7570;
+    --accent-soft: #e2f0ef;
+    --amber: #a05a0a;
+    --amber-soft: #f6ecdd;
+    --code-bg: #14201f;
+    --code-ink: #d4e4e2;
+    --code-accent: #7fd6c8;
+    --done: #3d7a46;
+    --shadow: 0 1px 2px rgba(28,37,40,.05), 0 4px 14px rgba(28,37,40,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    font-size: 16px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+  .mono { font-family: "Cascadia Code", Consolas, "SF Mono", monospace; }
+
+  /* ---------- header ---------- */
+  .eyebrow {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .75rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 .75rem;
+  }
+  h1 {
+    font-size: clamp(1.9rem, 4.5vw, 2.7rem);
+    line-height: 1.15;
+    margin: 0 0 .75rem;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    font-weight: 650;
+  }
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.08rem;
+    max-width: 42rem;
+    margin: 0 0 1.5rem;
+  }
+  .status-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .5rem; }
+  .chip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .78rem;
+    padding: .3rem .7rem;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    background: var(--panel);
+  }
+  .chip.now {
+    background: var(--accent-soft);
+    border-color: transparent;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .chip .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--accent); }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 3.5rem; }
+  h2 {
+    font-size: 1.45rem;
+    letter-spacing: -.01em;
+    margin: 0 0 .4rem;
+    font-weight: 650;
+    text-wrap: balance;
+  }
+  .section-sub { color: var(--ink-soft); margin: 0 0 1.5rem; max-width: 42rem; }
+  h2 .sec-num {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .8rem;
+    color: var(--ink-faint);
+    display: block;
+    letter-spacing: .12em;
+    margin-bottom: .35rem;
+  }
+
+  p { max-width: 42rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  strong { font-weight: 650; }
+
+  /* ---------- big idea callout ---------- */
+  .thesis {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow);
+    margin: 1.5rem 0;
+  }
+  .thesis p { margin: 0; font-size: 1.05rem; }
+  .thesis .label {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .72rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: .5rem;
+  }
+
+  /* ---------- concept list ---------- */
+  .concepts { display: flex; flex-direction: column; gap: .6rem; margin-top: 1.25rem; }
+  .concept {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: .3rem 1rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+  .concept .num {
+    font-family: "Cascadia Code", Consolas, monospace;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: .95rem;
+    padding-top: .1rem;
+  }
+  .concept h3 { margin: 0; font-size: 1rem; font-weight: 650; }
+  .concept .file {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .78rem;
+    color: var(--ink-faint);
+    grid-column: 2;
+    margin-top: .1rem;
+    word-break: break-all;
+  }
+  .concept p { grid-column: 2; margin: .35rem 0 0; color: var(--ink-soft); font-size: .95rem; }
+
+  /* ---------- code ---------- */
+  pre.code {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 10px;
+    padding: 1.1rem 1.3rem;
+    overflow-x: auto;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .84rem;
+    line-height: 1.65;
+    margin: 1rem 0;
+  }
+  pre.code .c { color: #6d8583; }
+  pre.code .k { color: var(--code-accent); }
+  code.inline {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .85em;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: .1em .4em;
+    border-radius: 5px;
+  }
+
+  /* ---------- diagram ---------- */
+  .diagram-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+  .diagram-caption { font-size: .85rem; color: var(--ink-faint); margin-top: .5rem; text-align: center; }
+
+  /* ---------- milestones ---------- */
+  .milestone {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-top: 1.5rem;
+    overflow: hidden;
+  }
+  .milestone.current { border-color: var(--accent); border-width: 1.5px; }
+  .m-head {
+    display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap;
+    padding: 1.15rem 1.5rem .9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .m-badge {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-weight: 700;
+    font-size: .85rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: .25rem .6rem;
+    border-radius: 7px;
+    flex-shrink: 0;
+  }
+  .m-head h3 { margin: 0; font-size: 1.15rem; font-weight: 650; flex: 1; min-width: 12rem; }
+  .m-time {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .75rem; color: var(--ink-faint);
+  }
+  .m-now {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .72rem; font-weight: 600;
+    color: var(--amber); background: var(--amber-soft);
+    padding: .2rem .55rem; border-radius: 999px;
+    letter-spacing: .06em;
+  }
+  .m-done {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .72rem; font-weight: 600;
+    color: var(--done);
+    letter-spacing: .06em;
+  }
+  .milestone.finished .m-head h3 { color: var(--ink-faint); }
+  .m-body { padding: 1.1rem 1.5rem 1.4rem; }
+  .m-body > p:first-child { margin-top: 0; }
+
+  .m-row {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr;
+    gap: 1rem;
+    padding: .8rem 0;
+    border-top: 1px dashed var(--line);
+  }
+  .m-row:first-child { border-top: none; padding-top: 0; }
+  .m-label {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-top: .25rem;
+  }
+  .m-label.build { color: var(--accent); }
+  .m-label.verify { color: var(--amber); }
+  .m-row > div { min-width: 0; }
+  .m-row p { margin: 0 0 .5rem; }
+  .m-row p:last-child { margin-bottom: 0; }
+  .m-row ul { margin: 0; padding-left: 1.2rem; }
+  .m-row li { margin-bottom: .35rem; }
+  .m-row li:last-child { margin-bottom: 0; }
+  .m-row pre.code { margin: .5rem 0 0; }
+  @media (max-width: 560px) {
+    .m-row { grid-template-columns: 1fr; gap: .25rem; }
+  }
+
+  .readfile {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .82rem;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: .1em .45em;
+    border-radius: 5px;
+    word-break: break-all;
+  }
+
+  .check { list-style: none; padding-left: 0 !important; }
+  .check li { display: flex; gap: .6rem; align-items: baseline; }
+  .check li::before {
+    content: "☐";
+    color: var(--amber);
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  /* ---------- walkthrough steps ---------- */
+  .step-list {
+    counter-reset: step;
+    display: flex; flex-direction: column; gap: 1.4rem;
+    margin: .25rem 0 0; padding: 0; list-style: none;
+  }
+  .step-list > li { counter-increment: step; position: relative; padding-left: 2.5rem; }
+  .step-list > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: .05rem;
+    width: 1.65rem; height: 1.65rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .8rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-list h4 { margin: 0 0 .35rem; font-size: 1rem; font-weight: 650; }
+  .step-list p { margin: .35rem 0; color: var(--ink-soft); font-size: .95rem; }
+  .step-list pre.code { margin: .6rem 0; }
+  .filetag {
+    display: inline-block;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .74rem;
+    background: var(--code-bg); color: var(--code-accent);
+    padding: .18rem .55rem; border-radius: 6px;
+    margin: .3rem 0 .1rem;
+  }
+  details.solution {
+    margin: .6rem 0 0;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg);
+  }
+  details.solution summary {
+    cursor: pointer;
+    padding: .55rem .9rem;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .78rem; font-weight: 600;
+    color: var(--accent);
+    user-select: none;
+  }
+  details.solution[open] summary { border-bottom: 1px solid var(--line); }
+  details.solution .sol-body { padding: .75rem .9rem .95rem; }
+  details.solution .sol-body pre.code { margin: .25rem 0 .7rem; }
+  .why { font-size: .92rem; color: var(--ink-soft); margin: 0; }
+  .why ul { margin: .3rem 0 0; padding-left: 1.2rem; }
+  .why li { margin-bottom: .35rem; }
+  .why code.inline { font-size: .82em; }
+  .trouble { font-size: .92rem; color: var(--ink-soft); margin: .3rem 0 0; padding-left: 1.2rem; }
+  .trouble li { margin-bottom: .45rem; }
+
+  /* ---------- skip list ---------- */
+  .skip-grid { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+  .skip-item {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .78rem;
+    color: var(--ink-faint);
+    border: 1px solid var(--line);
+    padding: .3rem .65rem;
+    border-radius: 999px;
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--ink-faint) 55%, transparent);
+  }
+
+  /* ---------- footer ---------- */
+  .rules {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-top: 1.25rem;
+  }
+  .rules ol { margin: 0; padding-left: 1.3rem; }
+  .rules li { margin-bottom: .5rem; }
+  .rules li:last-child { margin-bottom: 0; }
+
+  /* ---------- Q&A ---------- */
+  .qa { display: flex; flex-direction: column; gap: .75rem; margin-top: 1.5rem; }
+  .qa-group-label {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .72rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 1.5rem 0 .25rem;
+  }
+  .qa-group-label:first-child { margin-top: 0; }
+  details.qa-item {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  details.qa-item summary {
+    cursor: pointer;
+    padding: .9rem 1.2rem;
+    font-weight: 600;
+    user-select: none;
+    line-height: 1.5;
+  }
+  details.qa-item summary::marker { color: var(--accent); }
+  details.qa-item[open] summary { border-bottom: 1px solid var(--line); }
+  .qa-body { padding: .9rem 1.2rem 1.1rem; }
+  .qa-body p { margin: 0 0 .7rem; color: var(--ink-soft); font-size: .95rem; }
+  .qa-body p:last-child { margin-bottom: 0; }
+  .qa-body pre.code { margin: .5rem 0 .8rem; }
+  .qa-body strong { color: var(--ink); }
+  .takeaway {
+    border-left: 2px solid var(--accent);
+    padding-left: .9rem;
+    margin-top: .9rem;
+    font-size: .93rem;
+    color: var(--ink-soft);
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-size: .85rem;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">mini-agents · a guided build in 6 milestones</p>
+    <h1>Build an agent system from scratch</h1>
+    <p class="lede">
+      A hands-on replica of <span class="mono">agents_and_connectors</span>, stripped to the parts that carry the logic.
+      You write every line; each milestone ends with a working, verifiable program and a side-by-side look at how the
+      real repo does the same thing.
+    </p>
+    <div class="status-row">
+      <span class="chip now"><span class="dot"></span>You are here: M4 — A React chat surface</span>
+      <span class="chip">stack: Python · FastAPI · LangGraph · React</span>
+      <span class="chip">LLM: OpenAI API direct</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="sec-num">/ 01</span>The one idea everything hangs on</h2>
+    <div class="thesis">
+      <span class="label">Thesis</span>
+      <p>
+        In this codebase, an <strong>agent is not a class hierarchy</strong> — it's a <strong>system prompt + a list of
+        tool names + a model choice</strong>, fed into one generic loop that alternates between
+        <em>“ask the LLM”</em> and <em>“run the tools it asked for.”</em> Fourteen agents, routing, streaming,
+        connectors — all of it is layered on top of a core you can write in ~50 lines. Your replica makes that core visible.
+      </p>
+    </div>
+
+    <p class="section-sub" style="margin-top:1.5rem">That core decomposes into six concepts. Every milestone below teaches exactly one or two of them:</p>
+
+    <div class="concepts">
+      <div class="concept">
+        <span class="num">1</span>
+        <h3>Agent = data, not code</h3>
+        <span class="file">src/agent/definitions/a03_forecasting.py</span>
+        <p>An <code class="inline">AgentDefinition</code> dataclass: id, name, description, system_prompt, tool_names, model. No subclasses — a new agent is a new data file.</p>
+      </div>
+      <div class="concept">
+        <span class="num">2</span>
+        <h3>One generic loop drives all agents</h3>
+        <span class="file">src/agent/base.py</span>
+        <p><code class="inline">BaseAgent</code>: a 2-node graph — call the LLM; if the reply contains tool calls, execute them and loop back; otherwise return the answer.</p>
+      </div>
+      <div class="concept">
+        <span class="num">3</span>
+        <h3>Tools live in a registry</h3>
+        <span class="file">src/agent/tools/__init__.py</span>
+        <p><code class="inline">@tool</code>-decorated functions in a <code class="inline">TOOL_REGISTRY</code> dict; <code class="inline">get_tools_by_name()</code> hands each agent only its declared subset.</p>
+      </div>
+      <div class="concept">
+        <span class="num">4</span>
+        <h3>A registry + factory assemble live agents</h3>
+        <span class="file">src/agent/registry.py · src/config.py</span>
+        <p><code class="inline">create_llm(profile)</code> hides the provider; the registry filters tools, picks the LLM, builds and caches the agent instance.</p>
+      </div>
+      <div class="concept">
+        <span class="num">5</span>
+        <h3>Routing is one cheap LLM call</h3>
+        <span class="file">src/agent/router.py</span>
+        <p>AUTO mode = list every agent's <code class="inline">description</code>, ask a small model “which id?”, regex-extract the answer, never raise — fall back to the previous agent.</p>
+      </div>
+      <div class="concept">
+        <span class="num">6</span>
+        <h3>Streaming is events, not magic</h3>
+        <span class="file">src/api/chat_routes.py · chatkit/app/src/chat/useChatStream.ts</span>
+        <p>The agent yields <code class="inline">(thinking | tool_call | tool_result | response)</code> tuples → mapped to SSE events → a React hook applies them to message state.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">/ 02</span>The loop you'll build first</h2>
+    <p class="section-sub">This is the entire “agent framework.” Everything else in the course decorates this diagram.</p>
+    <div class="diagram-panel">
+<pre class="mermaid">
+flowchart LR
+    U([user message]) --> A["agent node<br/>llm_with_tools.invoke(messages)"]
+    A --> D{reply has<br/>tool_calls?}
+    D -- yes --> T["tools node<br/>run each tool,<br/>append ToolMessages"]
+    T --> A
+    D -- no --> R([final answer])
+</pre>
+    </div>
+    <p class="diagram-caption">The ReAct loop: in M1a you hand-write it; in M1b you express the same thing as a LangGraph <span class="mono">StateGraph</span>.</p>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">/ 03</span>What you're building</h2>
+    <p class="section-sub">Target structure of the new repo at <span class="mono">C:\Users\NazliC\Desktop\repos\mini-agents\</span>. Files appear milestone by milestone.</p>
+<pre class="code">mini-agents/
+├── pyproject.toml          <span class="c"># fastapi, uvicorn, langchain-openai, langgraph</span>
+├── .env                    <span class="c"># OPENAI_API_KEY  (gitignored!)</span>
+├── cli.py                  <span class="c"># M1  terminal REPL — simplest entry point</span>
+├── src/
+│   ├── config.py           <span class="c"># M0  create_llm() factory</span>
+│   ├── tools.py            <span class="c"># M1a @tool functions + TOOL_REGISTRY</span>
+│   ├── agents/
+│   │   ├── base.py         <span class="c"># M1  AgentDefinition + the loop</span>
+│   │   ├── definitions.py  <span class="c"># M2  2–3 agents as pure data</span>
+│   │   ├── registry.py     <span class="c"># M2  definition → live agent, cached</span>
+│   │   └── router.py       <span class="c"># M2  classify_agent() AUTO triage</span>
+│   └── api/
+│       ├── main.py         <span class="c"># M3  FastAPI app</span>
+│       └── chat.py         <span class="c"># M3  POST /api/chat/stream (SSE)</span>
+└── web/                    <span class="c"># M4  Vite + React chat UI</span></pre>
+
+    <p><strong>Deliberately skipped</strong> — production scaffolding in the original that adds nothing to the lesson:</p>
+    <div class="skip-grid">
+      <span class="skip-item">Postgres</span>
+      <span class="skip-item">Celery + Redis</span>
+      <span class="skip-item">MCP servers ×3</span>
+      <span class="skip-item">OAuth connectors</span>
+      <span class="skip-item">JWT / SSO auth</span>
+      <span class="skip-item">OTel tracing</span>
+      <span class="skip-item">Uptime Kuma</span>
+      <span class="skip-item">Azure DevOps integration</span>
+      <span class="skip-item">workflows panel</span>
+      <span class="skip-item">nginx / TLS</span>
+      <span class="skip-item">vendored chatkit packages</span>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">/ 04</span>The milestones</h2>
+    <p class="section-sub">
+      <strong>Current and completed milestones are full step-by-step walkthroughs</strong> — every file is spelled out, and each coding step has a
+      collapsed <span class="mono" style="color:var(--accent)">▸ show the code + why</span> block. Try the step from its description
+      first; open the block when stuck, or afterwards to compare. Later milestones are summaries — I'll expand each one into a
+      walkthrough when you reach it. Every card ends with a verification you must pass before moving on.
+    </p>
+
+    <!-- M0 -->
+    <div class="milestone finished">
+      <div class="m-head">
+        <span class="m-badge">M0</span>
+        <h3>Setup + the LLM factory</h3>
+        <span class="m-done">✓ DONE</span>
+        <span class="m-time">~30 min</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div><p>A <strong>factory keyed by a model name</strong> means nothing else in the codebase knows which provider it's talking to. The original's <span class="mono">create_llm</span> is 70 lines only because it juggles three Azure providers — the shape is the lesson, not the size.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>Create the project folder</h4>
+                <p>Open a PowerShell terminal and run, line by line:</p>
+<pre class="code">cd C:\Users\NazliC\Desktop\repos
+mkdir mini-agents
+cd mini-agents
+git init</pre>
+                <p><code class="inline">git init</code> turns the folder into a git repository from day one, so every milestone can be a commit you can look back at (or revert to).</p>
+              </li>
+              <li>
+                <h4>Create a Python virtual environment</h4>
+<pre class="code">python -m venv .venv
+.venv\Scripts\Activate.ps1</pre>
+                <p>A <strong>venv</strong> is a private copy of Python for this project, so its packages don't mix with other projects. After activating, your prompt shows <code class="inline">(.venv)</code> — you'll need to re-activate in every new terminal.</p>
+              </li>
+              <li>
+                <h4>Install the five packages</h4>
+<pre class="code">pip install langchain-openai langgraph fastapi uvicorn python-dotenv</pre>
+                <p class="why">What each one is for:</p>
+                <ul class="why" style="list-style: disc;">
+                  <li><code class="inline">langchain-openai</code> — the <code class="inline">ChatOpenAI</code> class: a thin wrapper around OpenAI's API whose <code class="inline">.bind_tools()</code> method we'll rely on in M1a.</li>
+                  <li><code class="inline">langgraph</code> — the graph framework; unused until M1b.</li>
+                  <li><code class="inline">fastapi</code> + <code class="inline">uvicorn</code> — the web server; unused until M3.</li>
+                  <li><code class="inline">python-dotenv</code> — reads your <code class="inline">.env</code> file so the API key never lives in code.</li>
+                </ul>
+              </li>
+              <li>
+                <h4>Store your API key — safely</h4>
+                <p>Create <strong>two text files</strong> in the repo root (VS Code: File → New File):</p>
+                <span class="filetag">.env</span>
+<pre class="code">OPENAI_API_KEY=sk-...paste your real key here...</pre>
+                <span class="filetag">.gitignore</span>
+<pre class="code">.env
+.venv/
+__pycache__/</pre>
+                <p><strong>Why:</strong> the key is a secret — <code class="inline">.gitignore</code> guarantees git can never commit it. At runtime, <code class="inline">python-dotenv</code> copies it from <code class="inline">.env</code> into the process environment, where <code class="inline">ChatOpenAI</code> automatically finds a variable named <code class="inline">OPENAI_API_KEY</code>. You never pass the key around in code.</p>
+              </li>
+              <li>
+                <h4>Write the LLM factory</h4>
+                <p>Create a <code class="inline">src</code> folder containing an <strong>empty</strong> file named <code class="inline">__init__.py</code> (this makes <code class="inline">src</code> importable as a package) and this file:</p>
+                <span class="filetag">src/config.py</span>
+<pre class="code">from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+
+load_dotenv()  <span class="c"># reads .env → environment variables. Runs once, at import.</span>
+
+def create_llm(model: str = "gpt-4o-mini"):
+    <span class="c"># TODO: return a ChatOpenAI instance for `model`, with temperature=0</span>
+    ...</pre>
+                <p>Your job is the one-line TODO. Hint: <code class="inline">ChatOpenAI(...)</code> takes <code class="inline">model=</code> and <code class="inline">temperature=</code> keyword arguments.</p>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+
+load_dotenv()
+
+def create_llm(model: str = "gpt-4o-mini") -> ChatOpenAI:
+    return ChatOpenAI(model=model, temperature=0)</pre>
+                    <p class="why">
+                      Yes — it's genuinely this small. Why it still matters:
+                    </p>
+                    <ul class="why">
+                      <li><code class="inline">temperature=0</code> makes answers near-deterministic — easier to debug while learning.</li>
+                      <li>This function is <strong>the only place in the whole project that knows which provider you use</strong>. In M5, adding Claude support means editing this one function — nothing else changes. That's the same trick the original's <span class="mono">create_llm</span> plays with three Azure providers across 14 agents.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Prove it works</h4>
+                <span class="filetag">hello.py &nbsp;(repo root)</span>
+<pre class="code">from src.config import create_llm
+
+llm = create_llm()
+reply = llm.invoke("Say hi in exactly 5 words")
+print(reply.content)</pre>
+                <p><code class="inline">.invoke()</code> sends one message and blocks until the answer arrives; it returns an <code class="inline">AIMessage</code> object whose <code class="inline">.content</code> is the text. Run it from the repo root:</p>
+<pre class="code">python hello.py
+<span class="c"># → Hello there, nice to meet!</span></pre>
+                <p class="why"><strong>If it fails:</strong></p>
+                <ul class="trouble">
+                  <li><code class="inline">ModuleNotFoundError: No module named 'src'</code> → you're not in the repo root, or <code class="inline">src/__init__.py</code> is missing.</li>
+                  <li><code class="inline">AuthenticationError</code> / 401 → key is wrong or <code class="inline">.env</code> isn't being read; check with <code class="inline">python -c "import os; from dotenv import load_dotenv; load_dotenv(); print(os.environ.get('OPENAI_API_KEY'))"</code>.</li>
+                  <li><code class="inline">ModuleNotFoundError: langchain_openai</code> → the venv isn't active (no <code class="inline">(.venv)</code> in your prompt).</li>
+                </ul>
+              </li>
+              <li>
+                <h4>Commit</h4>
+<pre class="code">git add .
+git commit -m "M0: project setup + create_llm factory"</pre>
+                <p>Check <code class="inline">git status</code> first — <code class="inline">.env</code> must <strong>not</strong> appear in the commit.</p>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">Read</span>
+          <div><p><span class="readfile">docs/agents/README.md</span> — the whole pattern in prose. <em>Don't</em> read <span class="mono">base.py</span> yet; it lands harder after you've written your own loop.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li><code class="inline">python hello.py</code> prints a reply from the model.</li>
+            <li><code class="inline">git status</code> shows <code class="inline">.env</code> as ignored, not tracked.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M1a -->
+    <div class="milestone finished">
+      <div class="m-head">
+        <span class="m-badge">M1a</span>
+        <h3>The raw ReAct loop — the heart</h3>
+        <span class="m-done">✓ DONE</span>
+        <span class="m-time">~1 session</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div>
+            <p>Tool calling demystified: <strong>the LLM never runs anything.</strong> When you “give” it tools, you're really sending it a list of function signatures. If it decides one is needed, its reply contains no text — just a structured request:</p>
+<pre class="code">AIMessage(
+    content="",
+    tool_calls=[{ "name": "get_campaign_stats",
+                  "args": {"campaign_id": "C001"},
+                  "id":   "call_abc123" }]
+)</pre>
+            <p><strong>Your code</strong> looks up the function, runs it, appends the result as a <code class="inline">ToolMessage</code> (tagged with that same <code class="inline">id</code>), and calls the LLM again — now it can see the data and answer. That's the whole secret. The loop is ~40 lines.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>Create the fake data</h4>
+                <p>Tools need something to look up. Make a <code class="inline">data</code> folder with:</p>
+                <span class="filetag">data/campaigns.json</span>
+<pre class="code">[
+  {"id": "C001", "name": "Summer Stamps",   "weeks": 12, "participation_rate": 0.31, "avg_weekly_spend": 24.50},
+  {"id": "C002", "name": "Back to School",  "weeks": 8,  "participation_rate": 0.22, "avg_weekly_spend": 31.00},
+  {"id": "C003", "name": "Winter Loyalty",  "weeks": 16, "participation_rate": 0.41, "avg_weekly_spend": 19.75}
+]</pre>
+                <p>(Feel free to invent your own domain — the tools just need structured data to query.)</p>
+              </li>
+              <li>
+                <h4>Write three tools + the registry</h4>
+                <span class="filetag">src/tools.py</span>
+                <p>A tool is a plain function with the <code class="inline">@tool</code> decorator. <strong>The docstring is the most important line</strong> — it's the description the LLM reads to decide when to call it. Build this shape:</p>
+<pre class="code">import json
+from pathlib import Path
+from langchain_core.tools import tool
+
+def _load_campaigns():
+    return json.loads(Path("data/campaigns.json").read_text())
+
+@tool
+def list_campaigns() -> str:
+    """List all campaigns with their ids and names."""
+    <span class="c"># TODO: return e.g. "C001: Summer Stamps\nC002: ..." built from _load_campaigns()</span>
+
+@tool
+def get_campaign_stats(campaign_id: str) -> str:
+    """Get weeks, participation rate and average weekly spend for one campaign by its id."""
+    <span class="c"># TODO: find the matching campaign; return its fields as a string.</span>
+    <span class="c">#       If the id doesn't exist, return "No campaign with id ..." — never raise!</span>
+
+@tool
+def forecast_participation(campaign_id: str, extra_weeks: int) -> str:
+    """Forecast the participation rate if a campaign ran extra_weeks longer."""
+    <span class="c"># TODO: made-up formula, e.g. rate * (1 + 0.02 * extra_weeks), capped at 1.0</span>
+
+TOOL_REGISTRY = {
+    "list_campaigns": list_campaigns,
+    "get_campaign_stats": get_campaign_stats,
+    "forecast_participation": forecast_participation,
+}
+
+def get_tools_by_name(names: list[str]) -> list:
+    return [TOOL_REGISTRY[n] for n in names]</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">@tool
+def list_campaigns() -> str:
+    """List all campaigns with their ids and names."""
+    return "\n".join(f'{c["id"]}: {c["name"]}' for c in _load_campaigns())
+
+@tool
+def get_campaign_stats(campaign_id: str) -> str:
+    """Get weeks, participation rate and average weekly spend for one campaign by its id."""
+    for c in _load_campaigns():
+        if c["id"] == campaign_id:
+            return (f'{c["name"]}: {c["weeks"]} weeks, '
+                    f'{c["participation_rate"]:.0%} participation, '
+                    f'€{c["avg_weekly_spend"]:.2f} avg weekly spend')
+    return f"No campaign with id {campaign_id}. Use list_campaigns to see valid ids."
+
+@tool
+def forecast_participation(campaign_id: str, extra_weeks: int) -> str:
+    """Forecast the participation rate if a campaign ran extra_weeks longer."""
+    for c in _load_campaigns():
+        if c["id"] == campaign_id:
+            rate = min(1.0, c["participation_rate"] * (1 + 0.02 * extra_weeks))
+            return f'Forecast for {c["name"]} +{extra_weeks} weeks: {rate:.0%} participation'
+    return f"No campaign with id {campaign_id}."</pre>
+                    <ul class="why">
+                      <li>Tools <strong>return strings and never raise</strong> — an error message is something the LLM can read, apologise for, and recover from (e.g. by calling <span class="mono">list_campaigns</span> to find a valid id). An exception just crashes your loop. The original repo follows this rule everywhere.</li>
+                      <li>Type hints on the arguments (<code class="inline">campaign_id: str</code>) aren't cosmetic — <code class="inline">@tool</code> turns them into the JSON schema the LLM sees.</li>
+                      <li>The registry dict + <code class="inline">get_tools_by_name</code> is exactly the original's pattern (~line 2778 of <span class="mono">tools/__init__.py</span>), just 3 tools instead of 120.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Define what an agent <em>is</em></h4>
+                <span class="filetag">src/agents/base.py</span> <span style="font-size:.85rem;color:var(--ink-faint)">(create <code class="inline">src/agents/__init__.py</code> too, empty)</span>
+<pre class="code">from dataclasses import dataclass, field
+
+@dataclass
+class AgentDefinition:
+    agent_id: str
+    name: str
+    description: str        <span class="c"># one line — the router will read this in M2</span>
+    system_prompt: str
+    tool_names: list[str] = field(default_factory=list)
+    model: str = "gpt-4o-mini"</pre>
+                <p>This is complete as given — copy it. Notice there is no behaviour here at all: an agent is <em>configuration</em>.</p>
+              </li>
+              <li>
+                <h4>Hand-write the ReAct loop</h4>
+                <p>Also in <span class="mono">base.py</span>. Follow the diagram from section 02 literally:</p>
+<pre class="code">from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from src.config import create_llm
+from src.tools import TOOL_REGISTRY, get_tools_by_name
+
+def run_agent(defn: AgentDefinition, user_text: str) -> str:
+    tools = get_tools_by_name(defn.tool_names)
+    llm_with_tools = create_llm(defn.model).bind_tools(tools)
+
+    messages = [SystemMessage(defn.system_prompt), HumanMessage(user_text)]
+
+    while True:
+        reply = llm_with_tools.invoke(messages)
+        messages.append(reply)
+
+        if not reply.tool_calls:              <span class="c"># no tools requested → we're done</span>
+            return reply.content
+
+        for call in reply.tool_calls:
+            <span class="c"># TODO (3 lines):</span>
+            <span class="c"># 1. print(f"  → {call['name']}({call['args']})")   — so you SEE the loop</span>
+            <span class="c"># 2. result = TOOL_REGISTRY[call["name"]].invoke(call["args"])</span>
+            <span class="c"># 3. messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))</span></pre>
+                <p>The TODOs are spelled out — type them yourself rather than pasting; this is the 10 lines the entire course revolves around.</p>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">        for call in reply.tool_calls:
+            print(f"  → {call['name']}({call['args']})")
+            result = TOOL_REGISTRY[call["name"]].invoke(call["args"])
+            messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))</pre>
+                    <ul class="why">
+                      <li><code class="inline">bind_tools(tools)</code> is what sends the function schemas along with every request — that's all “giving the LLM tools” means.</li>
+                      <li>The conversation <strong>accumulates</strong>: system → human → AI (tool request) → tool result → AI… The LLM re-reads everything each iteration; that's how it “remembers” the tool output.</li>
+                      <li><code class="inline">tool_call_id</code> must echo the request's <code class="inline">id</code> — it's how the LLM matches results to requests when it made several calls at once.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Wire up a REPL</h4>
+                <span class="filetag">cli.py &nbsp;(repo root)</span>
+<pre class="code">from src.agents.base import AgentDefinition, run_agent
+
+ANALYST = AgentDefinition(
+    agent_id="A01",
+    name="Campaign Analyst",
+    description="Answers questions about loyalty campaign performance and forecasts.",
+    system_prompt="You are a concise loyalty-campaign analyst. "
+                  "Use your tools to look up real data before answering.",
+    tool_names=["list_campaigns", "get_campaign_stats", "forecast_participation"],
+)
+
+while True:
+    q = input("\nyou> ")
+    if q in ("q", "exit"): break
+    print("bot>", run_agent(ANALYST, q))</pre>
+                <p>Complete as given. Run <code class="inline">python cli.py</code> and try:</p>
+                <ul class="why" style="list-style: disc;">
+                  <li><em>“Which campaigns are there?”</em> — one tool call.</li>
+                  <li><em>“What's the participation of Winter Loyalty?”</em> — watch it chain <span class="mono">list_campaigns</span> → <span class="mono">get_campaign_stats</span>, because you gave it a name, not an id. <strong>Nobody programmed that chain</strong> — that's the loop + good docstrings.</li>
+                  <li><em>“What would 4 more weeks do to it?”</em> — note it fails to remember context! Each <span class="mono">run_agent</span> call starts fresh. Sessions come later — for now, ask it in one sentence.</li>
+                </ul>
+              </li>
+              <li>
+                <h4>Commit</h4>
+<pre class="code">git add . ; git commit -m "M1a: hand-written ReAct loop with 3 tools"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">Read</span>
+          <div><p><span class="readfile">src/agent/tools/__init__.py</span> — skim <span class="mono">list_campaigns</span> and the <span class="mono">TOOL_REGISTRY</span> block (~line 2778). Notice every tool is a thin wrapper delegating to a shared service.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li>A question that <em>requires</em> one tool gets answered via that tool.</li>
+            <li>A question that requires <em>two chained</em> tool calls works (watch the loop go around twice).</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M1b -->
+    <div class="milestone finished">
+      <div class="m-head">
+        <span class="m-badge">M1b</span>
+        <h3>Same loop, now in LangGraph</h3>
+        <span class="m-done">✓ DONE</span>
+        <span class="m-time">~1 session</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div>
+            <p>LangGraph doesn't add intelligence — it gives your loop a <strong>shape</strong>: named nodes, explicit edges, and a state object the framework carries between them. Your <code class="inline">while True</code> becomes a graph; your <code class="inline">messages.append(...)</code> becomes a <em>reducer</em>. Nothing about the behaviour changes — that's the point, and seeing it is the lesson.</p>
+            <p>You'll also restructure <code class="inline">run_agent</code> into a <strong>generator</strong> that yields progress events. That generator becomes your streaming contract: in M3 each yielded tuple maps 1:1 to an SSE event the browser receives.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>Meet the state object</h4>
+                <p>Add to the top of <span class="mono">src/agents/base.py</span> (keep your <span class="mono">run_agent</span> — you'll want it for comparison):</p>
+<pre class="code">from typing import Annotated, TypedDict
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]</pre>
+                <p>Complete as given. <strong>What it means:</strong> a LangGraph graph passes a state dict from node to node. Each node returns a <em>partial update</em> (just the new messages), and the <code class="inline">add_messages</code> annotation is the <strong>reducer</strong> — the rule for merging updates into state. It appends. In M1a, <code class="inline">messages.append(reply)</code> <em>was</em> your state management; this line is the same thing, made declarative so the framework can stream and checkpoint it.</p>
+              </li>
+              <li>
+                <h4>Rebuild the loop as a graph</h4>
+                <p>Below your dataclass, write the class. The two node functions are given; the wiring is your TODO — it's the exact shape of the section 02 diagram:</p>
+<pre class="code">class BaseAgent:
+    def __init__(self, defn: AgentDefinition):
+        self.defn = defn
+        tools = get_tools_by_name(defn.tool_names)
+        self.llm_with_tools = create_llm(defn.model).bind_tools(tools)
+        self.graph = self._build_graph(tools)
+
+    def _build_graph(self, tools):
+        def agent_node(state: AgentState):
+            msgs = state["messages"]
+            if not isinstance(msgs[0], SystemMessage):
+                msgs = [SystemMessage(self.defn.system_prompt)] + msgs
+            reply = self.llm_with_tools.invoke(msgs)
+            return {"messages": [reply]}   <span class="c"># partial update — add_messages appends it</span>
+
+        def should_continue(state: AgentState):
+            <span class="c"># TODO: return "tools" if the last message has tool_calls, else END</span>
+            ...
+
+        workflow = StateGraph(AgentState)
+        <span class="c"># TODO (5 lines):</span>
+        <span class="c"># 1. add node "agent"  → agent_node</span>
+        <span class="c"># 2. add node "tools"  → ToolNode(tools)</span>
+        <span class="c"># 3. set the entry point to "agent"</span>
+        <span class="c"># 4. add conditional edges from "agent" via should_continue → {"tools": "tools", END: END}</span>
+        <span class="c"># 5. add an edge "tools" → "agent"   (the loop back!)</span>
+        return workflow.compile()</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">        def should_continue(state: AgentState):
+            last = state["messages"][-1]
+            return "tools" if last.tool_calls else END
+
+        workflow = StateGraph(AgentState)
+        workflow.add_node("agent", agent_node)
+        workflow.add_node("tools", ToolNode(tools))
+        workflow.set_entry_point("agent")
+        workflow.add_conditional_edges("agent", should_continue,
+                                       {"tools": "tools", END: END})
+        workflow.add_edge("tools", "agent")
+        return workflow.compile()</pre>
+                    <ul class="why">
+                      <li>Map it onto your M1a loop: <code class="inline">agent_node</code> = the invoke + append; <code class="inline">should_continue</code> = your <code class="inline">if not reply.tool_calls</code>; <code class="inline">ToolNode(tools)</code> = your entire <code class="inline">for call in reply.tool_calls</code> block — it runs each call and builds the <code class="inline">ToolMessage</code>s with the right <code class="inline">tool_call_id</code> for you.</li>
+                      <li>The <code class="inline">"tools" → "agent"</code> edge is the <code class="inline">while True</code>. There's no loop keyword anywhere — the cycle in the graph <em>is</em> the loop.</li>
+                      <li>This is line-for-line the original's <span class="mono">_build_graph</span> (<span class="mono">src/agent/base.py:113-151</span>) minus its follow-up-chips prompt injection.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Make it a generator — your streaming contract</h4>
+                <p>Add a method to <code class="inline">BaseAgent</code>. <code class="inline">graph.stream(..., stream_mode="updates")</code> emits one dict per node execution, keyed by node name:</p>
+<pre class="code">    def stream_chat(self, user_text: str):
+        state = {"messages": [HumanMessage(user_text)]}
+        for update in self.graph.stream(state, stream_mode="updates"):
+            for node_name, node_out in update.items():
+                for msg in node_out["messages"]:
+                    <span class="c"># TODO — turn each message into a yielded tuple:</span>
+                    <span class="c"># • AIMessage WITH tool_calls  → yield ("tool_call", {"name": ..., "args": ...}) per call</span>
+                    <span class="c"># • ToolMessage                → yield ("tool_result", msg.content)</span>
+                    <span class="c"># • AIMessage WITHOUT tool_calls → yield ("response", msg.content)</span>
+                    ...</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">    def stream_chat(self, user_text: str):
+        state = {"messages": [HumanMessage(user_text)]}
+        for update in self.graph.stream(state, stream_mode="updates"):
+            for node_name, node_out in update.items():
+                for msg in node_out["messages"]:
+                    if isinstance(msg, ToolMessage):
+                        yield ("tool_result", msg.content)
+                    elif msg.tool_calls:
+                        for call in msg.tool_calls:
+                            yield ("tool_call", {"name": call["name"], "args": call["args"]})
+                    else:
+                        yield ("response", msg.content)</pre>
+                    <ul class="why">
+                      <li>A <strong>generator</strong> hands values out one at a time while the work is still running — exactly what a chat UI needs. The caller decides what to do with each tuple; the agent doesn't know or care that M3 will turn them into SSE events.</li>
+                      <li>This is the simplified twin of the original's <span class="mono">astream_chat_with_tools</span> (<span class="mono">base.py:243</span>) — theirs is async and adds a <code class="inline">("thinking", ...)</code> event, same idea.</li>
+                      <li>Check the <code class="inline">ToolMessage</code> case <em>first</em> — <code class="inline">ToolMessage</code> has no <code class="inline">.tool_calls</code> attribute, so the <code class="inline">elif</code> order matters.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Rewire the REPL</h4>
+                <p>In <span class="mono">cli.py</span>, swap <code class="inline">run_agent</code> for the class (complete as given):</p>
+<pre class="code">from src.agents.base import AgentDefinition, BaseAgent
+
+<span class="c"># ANALYST definition unchanged...</span>
+
+agent = BaseAgent(ANALYST)
+while True:
+    q = input("\nyou> ")
+    if q in ("q", "exit"): break
+    for kind, data in agent.stream_chat(q):
+        if kind == "tool_call":
+            print(f"  → {data['name']}({data['args']})")
+        elif kind == "response":
+            print("bot>", data)</pre>
+                <p>Note what changed: the CLI no longer prints from <em>inside</em> the agent — the <code class="inline">print</code> in your old loop was a hack. Now the agent yields events and the <em>caller</em> chooses how to display them. That separation is what makes M3 possible without touching the agent again.</p>
+              </li>
+              <li>
+                <h4>Compare, then commit</h4>
+                <p>Open the original's <span class="readfile">src/agent/base.py</span> next to yours and find your five wiring lines in theirs. Then:</p>
+<pre class="code">git add . ; git commit -m "M1b: BaseAgent as LangGraph StateGraph + stream_chat generator"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">Read</span>
+          <div><p><span class="readfile">src/agent/base.py</span> lines 113–151 (<span class="mono">_build_graph</span>) side-by-side with your version — it should look eerily familiar. Also <span class="mono">astream_chat_with_tools</span> for the tuple contract.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li>The three M1a test questions behave identically — same chained tool calls, same answers.</li>
+            <li>You can point at which part of the graph replaced each part of your hand-written loop.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M2 -->
+    <div class="milestone finished">
+      <div class="m-head">
+        <span class="m-badge">M2</span>
+        <h3>Many agents, one router</h3>
+        <span class="m-done">✓ DONE</span>
+        <span class="m-time">~1 session</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div>
+            <p>Scaling from one agent to N is a data problem, not a code problem. And “AI routing” is unglamorous: <strong>one cheap LLM call</strong> over the agents' <span class="mono">description</span> fields, a regex to extract the id, and a fallback so it never crashes. That description field you've been carrying since M1a? This is why it exists.</p>
+            <p>Design rule you'll feel here: <strong>the router must never raise.</strong> A wrong agent is a recoverable annoyance; a crashed router kills the chat. The original's <span class="mono">classify_agent</span> is wrapped in fallbacks for exactly this reason.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>Move agents into a definitions module</h4>
+                <span class="filetag">src/agents/definitions.py</span>
+                <p>Move <code class="inline">ANALYST</code> here from <span class="mono">cli.py</span> and add two more agents. <strong>The descriptions are your real work in this step</strong> — the router sees <em>only</em> them, so they must discriminate:</p>
+<pre class="code">from src.agents.base import AgentDefinition
+
+ANALYST = AgentDefinition(
+    agent_id="A01", name="Campaign Analyst",
+    description=<span class="c"># TODO — what THIS agent uniquely handles (current stats, facts)</span>,
+    system_prompt="You are a concise loyalty-campaign analyst. "
+                  "Use your tools to look up real data before answering.",
+    tool_names=["list_campaigns", "get_campaign_stats"],
+)
+
+FORECASTER = AgentDefinition(
+    agent_id="A02", name="Campaign Forecaster",
+    description=<span class="c"># TODO — what-if / extension / future questions</span>,
+    system_prompt=<span class="c"># TODO — persona + "always ground forecasts in tool output"</span>,
+    tool_names=["list_campaigns", "forecast_participation"],
+)
+
+GENERAL = AgentDefinition(
+    agent_id="A99", name="General Assistant",
+    description="General questions and anything not covered by the other agents.",
+    system_prompt="You are a friendly, concise assistant.",
+    tool_names=[],          <span class="c"># no tools — pure conversation</span>
+)
+
+AGENT_DEFINITIONS = {d.agent_id: d for d in (ANALYST, FORECASTER, GENERAL)}</pre>
+                <p>Note the tool subsets: the analyst can't forecast, the forecaster can't fetch stats. That's deliberate — it makes routing mistakes <em>visible</em> (the wrong agent will say it can't help), which is how you'll debug your descriptions.</p>
+              </li>
+              <li>
+                <h4>The registry — definitions become live agents, once</h4>
+                <span class="filetag">src/agents/registry.py</span>
+<pre class="code">from src.agents.base import BaseAgent
+from src.agents.definitions import AGENT_DEFINITIONS
+
+_cache: dict[str, BaseAgent] = {}
+
+def get_agent(agent_id: str) -> BaseAgent:
+    <span class="c"># TODO (3 lines): if agent_id not cached, build a BaseAgent from its</span>
+    <span class="c"># definition and store it; return the cached instance.</span></pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">def get_agent(agent_id: str) -> BaseAgent:
+    if agent_id not in _cache:
+        _cache[agent_id] = BaseAgent(AGENT_DEFINITIONS[agent_id])
+    return _cache[agent_id]</pre>
+                    <ul class="why">
+                      <li>Why cache? Building a <code class="inline">BaseAgent</code> compiles a graph and binds tools — wasteful to redo per message. The original caches with the key <code class="inline">agent_id:model_name:user_id</code> because users can override models and have personal connector tools; yours needs only <code class="inline">agent_id</code>.</li>
+                      <li>This function is the single door between “agent as data” and “agent as running object” — in M3 the API route will call it and nothing else.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>The AUTO router</h4>
+                <span class="filetag">src/agents/router.py</span>
+<pre class="code">import re
+from src.config import create_llm
+from src.agents.definitions import AGENT_DEFINITIONS
+
+ROUTER_PROMPT = """You are an agent router. Pick the best agent for the user's message.
+
+Agents:
+{agent_list}
+
+Reply with ONLY the agent id (e.g. A01).
+
+User message: {message}"""
+
+def classify_agent(message: str, previous_agent_id: str | None = None) -> str:
+    fallback = previous_agent_id or "A01"
+    <span class="c"># TODO:</span>
+    <span class="c"># 1. build agent_list: one line per agent — "A01: &lt;description&gt;"</span>
+    <span class="c"># 2. one create_llm().invoke(...) on the formatted prompt</span>
+    <span class="c"># 3. re.search for r"A\d\d" in the reply; if found AND it's a real</span>
+    <span class="c">#    key in AGENT_DEFINITIONS, return it</span>
+    <span class="c"># 4. anything else — no match, bad id, exception — return fallback</span></pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">def classify_agent(message: str, previous_agent_id: str | None = None) -> str:
+    fallback = previous_agent_id or "A01"
+    try:
+        agent_list = "\n".join(
+            f"{d.agent_id}: {d.description}" for d in AGENT_DEFINITIONS.values()
+        )
+        prompt = ROUTER_PROMPT.format(agent_list=agent_list, message=message)
+        reply = create_llm().invoke(prompt)
+        match = re.search(r"A\d\d", reply.content)
+        if match and match.group() in AGENT_DEFINITIONS:
+            return match.group()
+    except Exception:
+        pass
+    return fallback</pre>
+                    <ul class="why">
+                      <li>Regex + membership check instead of trusting the reply: LLMs sometimes answer “I'd choose A01 because…” or invent “A07”. Extract, validate, never assume.</li>
+                      <li>The bare <code class="inline">except Exception: pass</code> would be wrong almost anywhere else — here it's the design: routing is best-effort, and the fallback (the <em>previous</em> agent — sticky routing) is always a reasonable answer. Compare <span class="mono">src/agent/router.py</span> in the original: same shape, plus access control.</li>
+                      <li>Note the router itself has no tools and no loop — it's a plain one-shot LLM call. “Agent picks agent” sounds fancy; this is all it is.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Rewire the REPL for AUTO mode</h4>
+                <span class="filetag">cli.py</span>
+<pre class="code">from src.agents.registry import get_agent
+from src.agents.router import classify_agent
+
+current = None
+while True:
+    q = input("\nyou> ")
+    if q in ("q", "exit"): break
+    current = classify_agent(q, previous_agent_id=current)
+    print(f"  [router → {current}]")
+    for kind, data in get_agent(current).stream_chat(q):
+        if kind == "tool_call":
+            print(f"  → {data['name']}({data['args']})")
+        elif kind == "response":
+            print("bot>", data)</pre>
+                <p>Complete as given — <span class="mono">cli.py</span> now contains <em>zero</em> agent definitions. Data lives in <span class="mono">definitions.py</span>, assembly in <span class="mono">registry.py</span>, choice in <span class="mono">router.py</span>, display here. Four files, four jobs — that's the original's architecture in miniature.</p>
+              </li>
+              <li>
+                <h4>Test the routing — then tune the descriptions</h4>
+                <p>Try these and watch the <code class="inline">[router → ...]</code> line:</p>
+                <ul class="why" style="list-style: disc;">
+                  <li><em>“What's the participation of Winter Loyalty?”</em> → expect <strong>A01</strong>.</li>
+                  <li><em>“What if Summer Stamps ran 6 weeks longer?”</em> → expect <strong>A02</strong>.</li>
+                  <li><em>“hello! who are you?”</em> → expect <strong>A99</strong>.</li>
+                  <li><em>“How did Back to School perform, and would extending it help?”</em> — a genuinely ambiguous one. Whatever it picks, that agent is missing a tool for half the question. Sit with that: it's the real limitation of route-then-answer, and it's why the original keeps AUTO within lifecycle groups.</li>
+                </ul>
+                <p>If routing misfires, <strong>fix the description, not the router</strong> — that's the tuning loop agent builders actually live in. Then:</p>
+<pre class="code">git add . ; git commit -m "M2: definitions + registry + AUTO router"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">Read</span>
+          <div><p><span class="readfile">src/agent/registry.py</span> and <span class="readfile">src/agent/router.py</span> — note the cache key and the “never raises” design of <span class="mono">classify_agent</span>.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li>In AUTO mode, a domain question routes to the expected agent.</li>
+            <li>Off-topic chatter falls back gracefully instead of erroring.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M3 -->
+    <div class="milestone finished">
+      <div class="m-head">
+        <span class="m-badge">M3</span>
+        <h3>FastAPI + SSE streaming</h3>
+        <span class="m-done">✓ DONE</span>
+        <span class="m-time">~1 session</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div>
+            <p>Streaming here is <strong>events, not tokens</strong>: your M1b generator tuples map 1:1 to <strong>Server-Sent Events</strong>. SSE is just a long-lived HTTP response whose body arrives in chunks, each chunk formatted as:</p>
+<pre class="code">event: tool_call
+data: {"name": "get_campaign_stats", "args": {"campaign_id": "C003"}}
+<span class="c">← a blank line terminates each event — the double newline IS the protocol</span></pre>
+            <p>That's the whole protocol — plain text over plain HTTP. No websockets needed: chat responses only flow server→client, and SSE does exactly that with none of the connection ceremony. The server stays <strong>stateless</strong> for now: one request in, one event stream out, nothing remembered (sessions are M5's problem).</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>The FastAPI app shell</h4>
+                <span class="filetag">src/api/main.py</span> <span style="font-size:.85rem;color:var(--ink-faint)">(create <code class="inline">src/api/__init__.py</code> too, empty)</span>
+<pre class="code">from fastapi import FastAPI
+from src.api.chat import router as chat_router
+
+app = FastAPI(title="mini-agents")
+app.include_router(chat_router, prefix="/api")</pre>
+                <p>Complete as given. Run it (from the repo root, venv active):</p>
+<pre class="code">uvicorn src.api.main:app --reload --port 8000</pre>
+                <p><code class="inline">--reload</code> restarts the server when you save a file. Open <code class="inline">http://localhost:8000/docs</code> — FastAPI generates interactive API docs from your code for free; your endpoint will appear there once step 2 exists.</p>
+              </li>
+              <li>
+                <h4>The streaming endpoint</h4>
+                <span class="filetag">src/api/chat.py</span>
+                <p>This is the whole milestone: turn generator tuples into SSE lines. Note the shape — a function that <em>returns</em> a <code class="inline">StreamingResponse</code> wrapping an inner generator:</p>
+<pre class="code">import json
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from src.agents.registry import get_agent
+from src.agents.router import classify_agent
+
+router = APIRouter()
+
+class ChatRequest(BaseModel):
+    message: str
+    agent: str = "AUTO"
+
+def _sse(event: str, data) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+@router.post("/chat/stream")
+def chat_stream(req: ChatRequest):
+    def gen():
+        <span class="c"># TODO:</span>
+        <span class="c"># 1. resolve: agent_id = classify_agent(req.message) if req.agent == "AUTO" else req.agent</span>
+        <span class="c"># 2. yield _sse("agent", {"agent_id": agent_id})     ← tell the client who's answering</span>
+        <span class="c"># 3. for kind, data in get_agent(agent_id).stream_chat(req.message):</span>
+        <span class="c">#      "tool_call"   → yield _sse("tool_call", data)</span>
+        <span class="c">#      "tool_result" → yield _sse("tool_result", {"content": data})</span>
+        <span class="c">#      "response"    → yield _sse("text_delta", {"text": data})</span>
+        <span class="c"># 4. yield _sse("done", {})</span>
+        <span class="c"># 5. wrap 1–4 in try/except → yield _sse("error", {"message": str(e)})</span>
+        ...
+    return StreamingResponse(gen(), media_type="text/event-stream")</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">@router.post("/chat/stream")
+def chat_stream(req: ChatRequest):
+    def gen():
+        try:
+            agent_id = classify_agent(req.message) if req.agent == "AUTO" else req.agent
+            yield _sse("agent", {"agent_id": agent_id})
+            for kind, data in get_agent(agent_id).stream_chat(req.message):
+                if kind == "tool_call":
+                    yield _sse("tool_call", data)
+                elif kind == "tool_result":
+                    yield _sse("tool_result", {"content": data})
+                elif kind == "response":
+                    yield _sse("text_delta", {"text": data})
+            yield _sse("done", {})
+        except Exception as e:
+            yield _sse("error", {"message": str(e)})
+    return StreamingResponse(gen(), media_type="text/event-stream")</pre>
+                    <ul class="why">
+                      <li><code class="inline">chat_stream</code> returns <em>immediately</em> — the <code class="inline">gen()</code> generator hasn't run yet. FastAPI pulls from it chunk by chunk as the agent works, flushing each event to the socket. Your M1b decision to make <code class="inline">stream_chat</code> a generator is what makes this a 20-line file.</li>
+                      <li>The <code class="inline">"agent"</code> event is your version of the original's <code class="inline">X-Resolved-Agent</code> header — how the UI learns which agent AUTO picked (the M4 dropdown will read it).</li>
+                      <li>The final answer arrives as one big <code class="inline">text_delta</code> — same as the original, whose code comments admit “the agent loop produces it in one shot today.” True token streaming is an M5 stretch goal.</li>
+                      <li>The <code class="inline">error</code> event exists because <strong>you can't send an HTTP 500 after streaming has started</strong> — the 200 status line already went out. Errors must travel inside the stream. This surprises everyone once.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Watch it stream</h4>
+                <p>Server running in one terminal; in a second one (PowerShell — note <code class="inline">curl.exe</code>, not the <code class="inline">curl</code> alias, and the escaped quotes):</p>
+<pre class="code">curl.exe -N -X POST http://localhost:8000/api/chat/stream `
+  -H "Content-Type: application/json" `
+  -d '{\"message\": \"What is the participation of Winter Loyalty?\"}'</pre>
+                <p>Expected — events arriving <em>progressively</em>, not all at once (<code class="inline">-N</code> disables curl's buffering so you see them land):</p>
+<pre class="code">event: agent
+data: {"agent_id": "A01"}
+
+event: tool_call
+data: {"name": "list_campaigns", "args": {}}
+
+event: tool_result
+data: {"content": "C001: Summer Stamps\n..."}
+
+event: tool_call
+data: {"name": "get_campaign_stats", "args": {"campaign_id": "C003"}}
+
+event: tool_result
+data: {"content": "Winter Loyalty: 16 weeks, 41% participation, ..."}
+
+event: text_delta
+data: {"text": "The Winter Loyalty campaign has a participation rate of 41%..."}
+
+event: done
+data: {}</pre>
+                <p class="why"><strong>If it fails:</strong></p>
+                <ul class="trouble">
+                  <li>Nothing streams, then everything at once → you forgot <code class="inline">-N</code>, or an antivirus/proxy buffers localhost traffic.</li>
+                  <li><code class="inline">422 Unprocessable Entity</code> → the JSON quoting got mangled; PowerShell eats quotes — keep the <code class="inline">\"</code> escapes exactly.</li>
+                  <li><code class="inline">event: error</code> with a message → read it; it's your own exception, delivered the way a real client would see it.</li>
+                </ul>
+              </li>
+              <li>
+                <h4>Try the swagger docs + commit</h4>
+                <p>Open <code class="inline">http://localhost:8000/docs</code>, expand <code class="inline">POST /api/chat/stream</code>, and “Try it out” with <code class="inline">{"message": "hello!", "agent": "AUTO"}</code> — you'll see the raw SSE text. Then:</p>
+<pre class="code">git add . ; git commit -m "M3: FastAPI app + SSE streaming endpoint"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">Read</span>
+          <div><p><span class="readfile">src/api/chat_routes.py</span> — <span class="mono">_pump_agent</span> and the event mapping (~lines 261–378). Yours is the same mapping without the async queue plumbing; note their comment admitting the “stream” is a single text delta today.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li><code class="inline">curl.exe -N</code> shows the full event sequence, arriving progressively.</li>
+            <li>A tool-using question emits <code class="inline">tool_call</code> events <em>before</em> <code class="inline">text_delta</code>.</li>
+            <li>With <code class="inline">"agent": "AUTO"</code>, the first event names the agent the router picked.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M4 -->
+    <div class="milestone current">
+      <div class="m-head">
+        <span class="m-badge">M4</span>
+        <h3>A React chat surface</h3>
+        <span class="m-now">← IN PROGRESS</span>
+        <span class="m-time">~1–2 sessions</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div>
+            <p>The frontend's job is small: <strong>parse the SSE stream and apply each event to message state</strong>. One hook owns that; everything else is rendering.</p>
+            <p>The subtlety is that the network doesn't respect your event boundaries. <code class="inline">fetch</code> hands you arbitrary byte chunks — one read might contain two-and-a-half events. So you keep a <strong>buffer</strong>, split on the blank line (<code class="inline">\n\n</code>) that terminates an event, and leave the incomplete tail in the buffer for the next read. That's the entire trick, and it's why <span class="mono">sseParser.ts</span> exists as its own file in both your project and the original.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>Let the browser talk to your API (CORS)</h4>
+                <p>Vite serves on port 5173, your API on 8000 — different origins, so the browser blocks the request unless the server opts in. Two lines in <span class="mono">src/api/main.py</span>:</p>
+<pre class="code">from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"],
+                   allow_methods=["*"], allow_headers=["*"])</pre>
+                <p>Do this first — skipping it produces a confusing “Failed to fetch” with no useful detail in the console. Note what CORS is <em>not</em>: it isn't security for your server (anything can call your API with curl); it's the browser protecting <em>users</em> from a page silently calling other sites with their cookies.</p>
+              </li>
+              <li>
+                <h4>Scaffold the React app</h4>
+<pre class="code">cd C:\Users\NazliC\Desktop\repos\mini-agents
+npm create vite@latest web -- --template react-ts
+cd web
+npm install
+npm run dev</pre>
+                <p>Open <code class="inline">http://localhost:5173</code> — the Vite starter page. You'll replace <span class="mono">src/App.tsx</span> and add two files next to it.</p>
+              </li>
+              <li>
+                <h4>The SSE parser</h4>
+                <span class="filetag">web/src/sseParser.ts</span>
+                <p>An async generator that turns a <code class="inline">fetch</code> response body into <code class="inline">{event, data}</code> objects:</p>
+<pre class="code">export type SSEMessage = { event: string; data: any };
+
+export async function* parseSSEStream(res: Response): AsyncGenerator&lt;SSEMessage&gt; {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // TODO:
+    // 1. while buffer contains "\n\n": cut off everything before it (one raw event)
+    //    and keep the remainder in buffer
+    // 2. for each raw event, read the "event: " line and the "data: " line
+    // 3. yield { event, data: JSON.parse(dataLine) }
+  }
+}</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">    let idx: number;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+
+      let event = "message";
+      let data = "";
+      for (const line of raw.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7);
+        else if (line.startsWith("data: ")) data = line.slice(6);
+      }
+      if (data) yield { event, data: JSON.parse(data) };
+    }</pre>
+                    <ul class="why">
+                      <li>The <code class="inline">while</code> (not <code class="inline">if</code>) matters: one network read can deliver several complete events at once. Drain them all before reading again.</li>
+                      <li><code class="inline">decoder.decode(value, {stream: true})</code> — the <code class="inline">stream</code> flag handles a multi-byte character split across two chunks. Your € signs would otherwise arrive as garbage.</li>
+                      <li>Why not the browser's built-in <code class="inline">EventSource</code>? It only does GET requests, and you need POST with a JSON body. Hand-parsing is the standard workaround — the original repo does exactly this.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>The hook that owns chat state</h4>
+                <span class="filetag">web/src/useChatStream.ts</span>
+<pre class="code">import { useState } from "react";
+import { parseSSEStream } from "./sseParser";
+
+export type Msg = {
+  role: "user" | "assistant";
+  text: string;
+  tools: string[];      // tool calls made while answering
+  agent?: string;       // which agent answered
+};
+
+export function useChatStream() {
+  const [messages, setMessages] = useState&lt;Msg[]&gt;([]);
+  const [busy, setBusy] = useState(false);
+
+  async function send(text: string, agent: string) {
+    setBusy(true);
+    setMessages(m =&gt; [...m,
+      { role: "user", text, tools: [] },
+      { role: "assistant", text: "", tools: [] },   // placeholder we fill in
+    ]);
+
+    // helper: replace the last message using an updater function
+    const patch = (fn: (m: Msg) =&gt; Msg) =&gt;
+      setMessages(ms =&gt; ms.map((m, i) =&gt; (i === ms.length - 1 ? fn(m) : m)));
+
+    try {
+      const res = await fetch("http://localhost:8000/api/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, agent }),
+      });
+
+      for await (const { event, data } of parseSSEStream(res)) {
+        // TODO — one case per event your API emits:
+        // "agent"      → patch(m =&gt; ({ ...m, agent: data.agent }))
+        // "tool_call"  → append data.name to m.tools
+        // "text_delta" → append data.text to m.text
+        // "error"      → put the message into m.text
+        // ("tool_result" and "done" need no UI change)
+      }
+    } catch (e: any) {
+      patch(m =&gt; ({ ...m, text: `Request failed: ${e.message}` }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { messages, busy, send };
+}</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">      for await (const { event, data } of parseSSEStream(res)) {
+        if (event === "agent") {
+          patch(m =&gt; ({ ...m, agent: data.agent }));
+        } else if (event === "tool_call") {
+          patch(m =&gt; ({ ...m, tools: [...m.tools, data.name] }));
+        } else if (event === "text_delta") {
+          patch(m =&gt; ({ ...m, text: m.text + data.text }));
+        } else if (event === "error") {
+          patch(m =&gt; ({ ...m, text: `⚠ ${data.message}` }));
+        }
+      }</pre>
+                    <ul class="why">
+                      <li><code class="inline">data.agent</code> — matching the key <em>your</em> API sends (<code class="inline">{"agent": "A01"}</code>). Client and server event shapes are a contract; a typo here fails silently, which is why the original defines them in a shared <span class="mono">types.ts</span>.</li>
+                      <li><code class="inline">m.text + data.text</code> rather than <code class="inline">= data.text</code>: today your backend sends one delta, but the append version is already correct for the M5 token-streaming upgrade. Costs nothing now.</li>
+                      <li>Always build new objects (<code class="inline">{...m}</code>) instead of mutating — React re-renders by comparing references, so a mutated object looks unchanged and your UI freezes.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>The UI</h4>
+                <span class="filetag">web/src/App.tsx</span>
+                <p>Replace the file entirely. Complete as given — the interesting work was in the hook:</p>
+<pre class="code">import { useState } from "react";
+import { useChatStream } from "./useChatStream";
+
+const AGENTS = ["AUTO", "A01", "A02", "A99"];
+
+export default function App() {
+  const { messages, busy, send } = useChatStream();
+  const [input, setInput] = useState("");
+  const [agent, setAgent] = useState("AUTO");
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || busy) return;
+    send(input, agent);
+    setInput("");
+  }
+
+  return (
+    &lt;div style={{ maxWidth: 680, margin: "2rem auto", fontFamily: "system-ui" }}&gt;
+      &lt;h2&gt;mini-agents&lt;/h2&gt;
+
+      {messages.map((m, i) =&gt; (
+        &lt;div key={i} style={{ margin: "1rem 0" }}&gt;
+          &lt;b&gt;{m.role === "user" ? "you" : m.agent ?? "bot"}&lt;/b&gt;
+          {m.tools.map((t, j) =&gt; (
+            &lt;span key={j} style={{ marginLeft: 6, padding: "2px 8px", borderRadius: 99,
+                                   background: "#eef", fontSize: 12 }}&gt;{t}&lt;/span&gt;
+          ))}
+          &lt;div style={{ whiteSpace: "pre-wrap" }}&gt;{m.text || (busy ? "…" : "")}&lt;/div&gt;
+        &lt;/div&gt;
+      ))}
+
+      &lt;form onSubmit={submit} style={{ display: "flex", gap: 8 }}&gt;
+        &lt;select value={agent} onChange={e =&gt; setAgent(e.target.value)}&gt;
+          {AGENTS.map(a =&gt; &lt;option key={a}&gt;{a}&lt;/option&gt;)}
+        &lt;/select&gt;
+        &lt;input value={input} onChange={e =&gt; setInput(e.target.value)}
+               placeholder="Ask about a campaign…" style={{ flex: 1 }} /&gt;
+        &lt;button disabled={busy}&gt;Send&lt;/button&gt;
+      &lt;/form&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+                <p>Note <code class="inline">m.agent ?? "bot"</code> in the header — that's the AUTO resolution surfacing in the UI, the same job the original does with its <span class="mono">X-Resolved-Agent</span> header and dropdown sync.</p>
+              </li>
+              <li>
+                <h4>Run both halves</h4>
+                <p>Two terminals: <code class="inline">uvicorn src.api.main:app --reload --port 8000</code> in the repo root, <code class="inline">npm run dev</code> in <span class="mono">web/</span>. Then in the browser, with AUTO selected, ask <em>“What if Summer Stamps ran 6 weeks longer?”</em> — you should see the label read <strong>A02</strong>, chips appear for <span class="mono">list_campaigns</span> and <span class="mono">forecast_participation</span>, then the answer.</p>
+                <p class="why"><strong>If it fails:</strong></p>
+                <ul class="trouble">
+                  <li>Console says CORS / “Failed to fetch” → step 1 wasn't applied, or the server wasn't restarted after editing <span class="mono">main.py</span>.</li>
+                  <li>Chips never appear, answer arrives whole → your parser is probably waiting for the stream to finish; check you're yielding inside the <code class="inline">while</code> loop, not after it.</li>
+                  <li>Everything logs correctly but the screen never updates → you mutated a message object instead of creating a new one.</li>
+                </ul>
+<pre class="code">git add . ; git commit -m "M4: React chat UI with SSE streaming"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">Read</span>
+          <div><p><span class="readfile">chatkit/app/src/chat/useChatStream.ts</span> and <span class="readfile">sseParser.ts</span> — your model for the hook.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li>End-to-end in the browser: pick AUTO, ask a tool-requiring question, watch progress chips, then the answer.</li>
+            <li>The dropdown reflects which agent AUTO resolved to.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M5 -->
+    <div class="milestone">
+      <div class="m-head">
+        <span class="m-badge">M5</span>
+        <h3>Stretch goals — pick any</h3>
+        <span class="m-time">optional</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label build">Options</span>
+          <div>
+            <ul>
+              <li><strong>Server-side sessions</strong> — SQLite threads table; feed stored history back into the graph.</li>
+              <li><strong>True token streaming</strong> — switch the agent node to <code class="inline">llm.astream</code> and emit real <code class="inline">text_delta</code> chunks. (This actually improves on the original, which streams the final text in one shot.)</li>
+              <li><strong>Second provider</strong> — add Anthropic to <code class="inline">create_llm</code>, completing the factory lesson.</li>
+              <li><strong>A tool with real I/O</strong> — hit a public API and handle failures inside the tool.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">/ 05</span>How each session runs</h2>
+    <div class="rules">
+      <ol>
+        <li><strong>I explain</strong> the milestone's concept and point you at the matching files in the original repo.</li>
+        <li><strong>You code.</strong> I only write code when you explicitly ask (e.g. to unblock a bug).</li>
+        <li><strong>We verify</strong> — run the milestone's checks together, and I review your code.</li>
+        <li><strong>Comprehension check</strong> — 2–3 questions before the next milestone unlocks.</li>
+      </ol>
+    </div>
+    <p style="margin-top:1.25rem">
+      <strong>Definition of done:</strong> the full-stack demo works (browser chat → AUTO routing → visible tool calls → streamed answer),
+      and you can narrate the path of one request through every file you wrote — and point to its twin in
+      <span class="mono">agents_and_connectors</span>.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">/ 06</span>Questions &amp; answers</h2>
+    <p class="section-sub">
+      Every comprehension question from the course, with its answer collapsed. Try to answer before opening —
+      these are the ideas that transfer to the next agent system you build, not trivia about this one.
+    </p>
+
+    <div class="qa">
+      <p class="qa-group-label">After M0 — setup &amp; the LLM factory</p>
+
+      <details class="qa-item">
+        <summary>Your <span class="mono">hello.py</span> never mentions an API key. Trace how the key gets from your disk into the request to OpenAI.</summary>
+        <div class="qa-body">
+          <p><code class="inline">load_dotenv()</code> doesn't hand the key to anything — it copies the contents of <code class="inline">.env</code> into the <strong>process's environment variables</strong>. Separately, <code class="inline">ChatOpenAI</code> looks up <code class="inline">os.environ["OPENAI_API_KEY"]</code> when it's constructed, because that name is its convention.</p>
+          <p>Two parties that never talk to each other, meeting at the environment. That's why the debug check when auth fails is <code class="inline">print(os.environ.get("OPENAI_API_KEY"))</code> — you're inspecting the meeting point.</p>
+        </div>
+      </details>
+
+      <details class="qa-item">
+        <summary>If <span class="mono">create_llm("claude-sonnet")</span> returned an Anthropic model instead, why would nothing else in the project need to change?</summary>
+        <div class="qa-body">
+          <p>Adding the key to <code class="inline">.env</code> and editing the factory is the mechanical part. The reason <em>nothing else</em> changes is the <strong>interface</strong>: <code class="inline">ChatOpenAI</code> and <code class="inline">ChatAnthropic</code> both implement the same LangChain chat-model interface, and every caller in your project only ever uses <code class="inline">.invoke()</code> and <code class="inline">.bind_tools()</code> — which both provide.</p>
+          <p>If the two classes had different method names, the factory wouldn't save you at all.</p>
+          <p class="takeaway"><strong>Program against the interface, hide the implementation in one place.</strong> It's why the original repo swaps between GPT and Claude per agent without any agent code knowing.</p>
+        </div>
+      </details>
+
+      <p class="qa-group-label">After M1a — the raw ReAct loop</p>
+
+      <details class="qa-item">
+        <summary>What breaks if you append the <span class="mono">ToolMessage</span>s but forget to append <span class="mono">reply</span> — the AI message carrying the tool_calls?</summary>
+        <div class="qa-body">
+          <p>Not a Python error in your code. The next <code class="inline">invoke</code> sends a conversation containing <code class="inline">ToolMessage</code>s that answer a request which isn't there, and <strong>the OpenAI API rejects it with a 400</strong>: the protocol requires every <code class="inline">ToolMessage</code> to follow an <code class="inline">AIMessage</code> whose <code class="inline">tool_calls</code> carry the matching ids.</p>
+          <p class="takeaway">The pairing you built with <code class="inline">tool_call_id</code> is two-sided: results must point at requests, <em>and the requests must be present</em>. That's why the original persists complete message histories, never just the “useful” parts.</p>
+        </div>
+      </details>
+
+      <details class="qa-item">
+        <summary>Your answers came back as markdown with bold and lists. Which component produced that formatting — your tools, your loop, or the model?</summary>
+        <div class="qa-body">
+          <p><strong>The model.</strong> Your tools returned plain strings like <code class="inline">C001: Summer Stamps</code>, and your loop only moves messages around — it has no formatting logic anywhere. The model <em>composed</em> the final answer and chose to emit <code class="inline">**C001**</code> and numbered lists.</p>
+          <p>Proof you already had: the terminal shows raw asterisks, because nothing in your stack renders markdown. Rendering is the frontend's job (M4).</p>
+          <p class="takeaway">Knowing <em>who produces</em> formatting versus <em>who renders</em> it is exactly the seam between backend and frontend.</p>
+        </div>
+      </details>
+
+      <p class="qa-group-label">After M1b — the LangGraph swap</p>
+
+      <details class="qa-item">
+        <summary>In <span class="mono">agent_node</span> you prepend a <span class="mono">SystemMessage</span> when <span class="mono">msgs[0]</span> isn't one. Does that SystemMessage ever get <em>stored</em> in graph state?</summary>
+        <div class="qa-body">
+          <p><strong>No — never.</strong> Look at what the node returns: <code class="inline">{"messages": [reply]}</code>, just the reply. Your prepended list <code class="inline">msgs = [SystemMessage(...)] + msgs</code> is a <em>local variable</em> used for the <code class="inline">invoke</code> call and then discarded.</p>
+          <p>So in the persisted state, <code class="inline">msgs[0]</code> is always the <code class="inline">HumanMessage</code>, the <code class="inline">isinstance</code> check is always False, and a fresh <code class="inline">SystemMessage</code> is re-prepended locally on <em>every</em> iteration. It works — but not for the reason it looks like.</p>
+          <p>See it yourself: add <code class="inline">print(type(state["messages"][0]).__name__)</code> at the top of <code class="inline">agent_node</code> and watch it print <code class="inline">HumanMessage</code> every round.</p>
+          <p>So when does the check ever matter? When stored <em>history</em> is loaded into state with the system prompt already in it — that's M5.</p>
+        </div>
+      </details>
+
+      <details class="qa-item">
+        <summary>What if the node returned <span class="mono">{"messages": [SystemMessage(...), reply]}</span> instead? Trace the state over two iterations.</summary>
+        <div class="qa-body">
+          <p>With <code class="inline">add_messages</code>, whatever a node returns is <strong>appended to the end</strong> of state. Always. There is no “insert at the front”:</p>
+<pre class="code">state at start:        [Human]
+
+iteration 1
+  node returns:        [Sys, AI₁]           ← appended
+  state is now:        [Human, Sys, AI₁]
+  ToolNode appends:    [Human, Sys, AI₁, Tool₁]
+
+iteration 2
+  check reads state[0] → Human, NOT a SystemMessage
+  so it prepends ANOTHER Sys locally, returns [Sys, AI₂]  ← appended
+  state is now:        [Human, Sys, AI₁, Tool₁, Sys, AI₂]</pre>
+          <p>Two problems. <strong>The check can never save you</strong> — appending can't change <code class="inline">state[0]</code>, so every iteration adds one more system prompt. And <strong>they land in the wrong place</strong>: a system prompt's job is to be first, framing everything after it. Buried mid-conversation it's wasted tokens at best, and at worst the model reads it as a mid-chat instruction change.</p>
+          <p class="takeaway">A node's return value is not “the new state,” it's an <strong>instruction to the reducer</strong> — and with <code class="inline">add_messages</code>, that instruction is only ever “append these.”</p>
+        </div>
+      </details>
+
+      <p class="qa-group-label">After M2 — registry &amp; router</p>
+
+      <details class="qa-item">
+        <summary>Your registry caches one <span class="mono">BaseAgent</span> per agent id, shared across every question. Does anything leak from question 1 into question 2?</summary>
+        <div class="qa-body">
+          <p><strong>No.</strong> The cached object holds only reusable machinery: the definition, the bound LLM client, the compiled graph — none of which changes per question. Conversation state lives in the <code class="inline">state</code> dict, and <code class="inline">stream_chat</code> builds a fresh one on every call:</p>
+<pre class="code">state = {"messages": [HumanMessage(user_text)]}</pre>
+          <p>That dict is created, flows through the graph, and is discarded when the generator finishes. This is why caching is safe here — and would have been a disaster if you'd stored messages on <code class="inline">self</code>. It's also why your agents are currently amnesiac between questions.</p>
+          <p class="takeaway"><strong>The object is shared; the conversation is not.</strong> In M5, adding memory means loading history <em>into that state dict</em>, never onto the cached object.</p>
+        </div>
+      </details>
+
+      <details class="qa-item">
+        <summary><span class="mono">classify_agent</span> swallows every exception. If your OpenAI key expired, what would a user experience — and is that the right behaviour?</summary>
+        <div class="qa-body">
+          <p>Trace it: the router raises on the auth failure, swallows it, and returns <code class="inline">fallback</code> — so routing <strong>quietly degrades to “always A01”</strong> with no signal. Then <code class="inline">stream_chat</code> hits the same expired key, but nothing catches it there, so it surfaces as your <code class="inline">error</code> event.</p>
+          <p>The user does see a real error, so the system isn't lying to them. But <em>you</em> have lost the diagnosis: the error says “auth failed during chat,” and nothing tells you routing has been broken for every request.</p>
+          <p><strong>The swallow is right; the silence is wrong.</strong> Best-effort routing with a sticky fallback is genuinely correct — a mis-routed answer beats a dead chat. But <code class="inline">except Exception: pass</code> discards the evidence. One-line fix: <code class="inline">logger.warning("router failed, using %s", fallback, exc_info=True)</code> before falling back. That's what the original does — degrade silently <em>to the user</em>, loudly <em>to the operator</em>.</p>
+          <p class="takeaway">“Swallow the exception” and “discard the information” are <strong>separate decisions</strong>. Conflating them is one of the most common ways production systems become undebuggable.</p>
+        </div>
+      </details>
+
+      <p class="qa-group-label">After M3 — the API layer</p>
+
+      <details class="qa-item">
+        <summary>Validating the agent id: does that check belong in <span class="mono">chat.py</span> or <span class="mono">registry.py</span>?</summary>
+        <div class="qa-body">
+          <p><strong><span class="mono">registry.py</span></strong> — it's the single door between “agent as data” and “agent as running object,” and your CLI goes through it too. Validate there and every caller gets the same clear failure for free; validate in <code class="inline">chat.py</code> and the CLI still raises a bare <code class="inline">KeyError</code>, with the check duplicated for each new entry point.</p>
+          <p class="takeaway"><strong>Validate where the knowledge lives.</strong> <span class="mono">registry.py</span> is the only module that knows what a valid agent id is.</p>
+        </div>
+      </details>
+
+      <details class="qa-item">
+        <summary>Why must the <span class="mono">agent</span> event be emitted <em>after</em> <span class="mono">get_agent()</span>, not before?</summary>
+        <div class="qa-body">
+          <p>Because a bad id would otherwise announce a nonexistent agent first and fail second — a client would have already updated its dropdown before the error arrived.</p>
+          <p>There's a deeper constraint underneath: <strong>you can't send an HTTP 500 once streaming has started</strong> — the 200 status line already went out. Errors have to travel <em>inside</em> the stream as an <code class="inline">error</code> event, which means anything that can fail cheaply should fail <em>before</em> you commit to the stream's narrative.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <footer>
+    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · say “M4 done” in Claude Code to continue
+  </footer>
+</div>
