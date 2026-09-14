@@ -19,8 +19,9 @@ def chat_stream(req: ChatRequest):
     def gen():
         try:
             agent_id = classify_agent(req.message) if req.agent == "AUTO" else req.agent
+            agent = get_agent(agent_id)  # validates the id before we announce anything
             yield _sse("agent", {"agent": agent_id}) # tell the client which agent is being used
-            for kind, data in get_agent(agent_id).stream_chat(req.message):
+            for kind, data in agent.stream_chat(req.message):
                 if kind == "tool_call":
                     yield _sse("tool_call", data)
                 elif kind == "tool_result":
