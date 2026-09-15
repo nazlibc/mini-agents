@@ -458,7 +458,7 @@
       real repo does the same thing.
     </p>
     <div class="status-row">
-      <span class="chip now"><span class="dot"></span>You are here: M4 — A React chat surface</span>
+      <span class="chip now"><span class="dot"></span>You are here: M5 — stretch goals (or optional M4b)</span>
       <span class="chip">stack: Python · FastAPI · LangGraph · React</span>
       <span class="chip">LLM: OpenAI API direct</span>
     </div>
@@ -513,7 +513,7 @@
         <span class="num">6</span>
         <h3>Streaming is events, not magic</h3>
         <span class="file">src/api/chat_routes.py · chatkit/app/src/chat/useChatStream.ts</span>
-        <p>The agent yields <code class="inline">(thinking | tool_call | tool_result | response)</code> tuples → mapped to SSE events → a React hook applies them to message state.</p>
+        <p>The agent yields <code class="inline">(thinking | tool_call | tool_result | response)</code> tuples → mapped to SSE events → the browser applies them to the page as they arrive.</p>
       </div>
     </div>
   </section>
@@ -552,7 +552,8 @@ flowchart LR
 │   └── api/
 │       ├── main.py         <span class="c"># M3  FastAPI app</span>
 │       └── chat.py         <span class="c"># M3  POST /api/chat/stream (SSE)</span>
-└── web/                    <span class="c"># M4  Vite + React chat UI</span></pre>
+├── web/                    <span class="c"># M4a index.html + app.js — no build step</span>
+└── web-react/              <span class="c"># M4b optional: same page in Vite + React</span></pre>
 
     <p><strong>Deliberately skipped</strong> — production scaffolding in the original that adds nothing to the lesson:</p>
     <div class="skip-grid">
@@ -1404,20 +1405,247 @@ data: {}</pre>
       </div>
     </div>
 
-    <!-- M4 -->
-    <div class="milestone current">
+    <!-- M4a -->
+    <div class="milestone finished">
       <div class="m-head">
-        <span class="m-badge">M4</span>
-        <h3>A React chat surface</h3>
-        <span class="m-now">← IN PROGRESS</span>
-        <span class="m-time">~1–2 sessions</span>
+        <span class="m-badge">M4a</span>
+        <h3>A chat page — plain HTML &amp; JavaScript</h3>
+        <span class="m-done">✓ DONE</span>
+        <span class="m-time">~1 session</span>
       </div>
       <div class="m-body">
         <div class="m-row">
           <span class="m-label">Concept</span>
           <div>
-            <p>The frontend's job is small: <strong>parse the SSE stream and apply each event to message state</strong>. One hook owns that; everything else is rendering.</p>
-            <p>The subtlety is that the network doesn't respect your event boundaries. <code class="inline">fetch</code> hands you arbitrary byte chunks — one read might contain two-and-a-half events. So you keep a <strong>buffer</strong>, split on the blank line (<code class="inline">\n\n</code>) that terminates an event, and leave the incomplete tail in the buffer for the next read. That's the entire trick, and it's why <span class="mono">sseParser.ts</span> exists as its own file in both your project and the original.</p>
+            <p><strong>No React, no npm, no build step.</strong> One HTML file, served by the FastAPI server you already have. Same move as M1: hand-write it first, meet the framework afterwards — M4b does the identical thing in React, and it makes far more sense once you've done it yourself.</p>
+            <p>If frontend is new, here is the entire mental model. A web page is a <strong>tree of elements</strong> (the DOM). JavaScript running on that page can do three things: <em>find</em> an element, <em>change</em> it, and <em>react to events</em> (“run this function when the form is submitted”). That's it. There is no magic — you'll write about 40 lines of JavaScript and every one of them does one of those three things.</p>
+            <p>The one genuinely tricky part is the same as on the server: the network doesn't respect your event boundaries. <code class="inline">fetch</code> hands you arbitrary byte chunks — one read might contain two-and-a-half SSE events. So you keep a <strong>buffer</strong>, split on the blank line (<code class="inline">\n\n</code>) that ends an event, and leave the incomplete tail for the next read.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">Walkthrough</span>
+          <div>
+            <ol class="step-list">
+              <li>
+                <h4>Serve the page from FastAPI</h4>
+                <p>Add to <span class="mono">src/api/main.py</span>:</p>
+<pre class="code">from fastapi.responses import FileResponse
+
+@app.get("/")
+def index():
+    return FileResponse("web/index.html")</pre>
+                <p>Now <code class="inline">http://localhost:8000</code> serves your page and <code class="inline">http://localhost:8000/api/chat/stream</code> is your API — <strong>the same origin</strong>, so the browser raises no objection. (M4b needs a CORS step because Vite runs its own server on a different port; here you skip that whole category of problem.) One server, one URL, nothing to install.</p>
+              </li>
+              <li>
+                <h4>The page skeleton</h4>
+                <span class="filetag">web/index.html</span>
+                <p>Create the <code class="inline">web</code> folder and this file. Complete as given — read the comments, they name every piece you'll use from JavaScript:</p>
+<pre class="code">&lt;!doctype html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;mini-agents&lt;/title&gt;
+  &lt;style&gt;
+    body   { font-family: system-ui; max-width: 680px; margin: 2rem auto; }
+    .msg   { margin: 1rem 0; }
+    .body  { white-space: pre-wrap; }          /* keep the model's line breaks */
+    .chip  { background: #eef; border-radius: 99px;
+             padding: 2px 8px; margin-left: 6px; font-size: 12px; }
+    form   { display: flex; gap: 8px; }
+    #input { flex: 1; }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;h2&gt;mini-agents&lt;/h2&gt;
+
+  &lt;!-- every message gets appended in here --&gt;
+  &lt;div id="messages"&gt;&lt;/div&gt;
+
+  &lt;!-- id="..." is how JavaScript finds an element --&gt;
+  &lt;form id="chat-form"&gt;
+    &lt;select id="agent"&gt;
+      &lt;option&gt;AUTO&lt;/option&gt;&lt;option&gt;A01&lt;/option&gt;
+      &lt;option&gt;A02&lt;/option&gt;&lt;option&gt;A99&lt;/option&gt;
+    &lt;/select&gt;
+    &lt;input id="input" placeholder="Ask about a campaign…"&gt;
+    &lt;button&gt;Send&lt;/button&gt;
+  &lt;/form&gt;
+
+  &lt;script type="module" src="/web/app.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                <p>Add one more line to <span class="mono">main.py</span> so the browser can fetch <span class="mono">app.js</span>:</p>
+<pre class="code">from fastapi.staticfiles import StaticFiles
+app.mount("/web", StaticFiles(directory="web"), name="web")</pre>
+                <p>Restart uvicorn, open <code class="inline">http://localhost:8000</code>. You should see the heading, a dropdown, a text box and a Send button. Nothing works yet — that's correct.</p>
+              </li>
+              <li>
+                <h4>Make it talk to the API — no streaming yet</h4>
+                <span class="filetag">web/app.js</span>
+                <p>Get a working round-trip <em>before</em> adding streaming. Start with the whole response at once:</p>
+<pre class="code"><span class="c">// 1. FIND the elements we need (by the id= we gave them)</span>
+const messagesEl = document.getElementById("messages");
+const formEl     = document.getElementById("chat-form");
+const inputEl    = document.getElementById("input");
+const agentEl    = document.getElementById("agent");
+
+<span class="c">// 2. CREATE a message block; returns handles so we can fill it in later</span>
+function addMessage(who) {
+  const wrap  = document.createElement("div");
+  wrap.className = "msg";
+  const head  = document.createElement("b");        <span class="c">// "you" / "A01"</span>
+  const chips = document.createElement("span");     <span class="c">// tool chips go here</span>
+  const body  = document.createElement("div");      <span class="c">// the text</span>
+  body.className = "body";
+  wrap.append(head, chips, body);
+  messagesEl.append(wrap);
+  return { head, chips, body };
+}
+
+<span class="c">// 3. REACT to the form being submitted</span>
+formEl.addEventListener("submit", async (e) =&gt; {
+  e.preventDefault();          <span class="c">// stop the browser reloading the page</span>
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  addMessage("you").body.textContent = text;
+  const bot = addMessage("bot");
+  inputEl.value = "";
+
+  const res = await fetch("/api/chat/stream", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ message: text, agent: agentEl.value }),
+  });
+
+  bot.body.textContent = await res.text();   <span class="c">// TEMPORARY: dump the raw SSE text</span>
+});</pre>
+                <p>Reload and ask something. You'll see the <strong>raw event stream</strong> printed on the page — all those <code class="inline">event:</code> / <code class="inline">data:</code> lines you saw in curl. Ugly, but it proves the whole round-trip works: browser → your API → agent → back. Everything from here is turning that text into UI.</p>
+                <p class="why"><strong>Three things worth knowing</strong>, since they're new:</p>
+                <ul class="why" style="list-style: disc;">
+                  <li><code class="inline">async</code> / <code class="inline">await</code> — network calls take time. <code class="inline">await</code> means “pause here until the answer arrives,” and a function using it must be marked <code class="inline">async</code>. Python has the same keywords for the same reason.</li>
+                  <li><code class="inline">e.preventDefault()</code> — a form's default behaviour is to reload the page. You almost always want to stop that and handle it in JavaScript.</li>
+                  <li><code class="inline">textContent</code> sets text safely. Its cousin <code class="inline">innerHTML</code> would interpret the text as HTML — never use it for anything a user or a model produced.</li>
+                </ul>
+              </li>
+              <li>
+                <h4>Parse the stream</h4>
+                <p>Add this above the <code class="inline">addEventListener</code> call. It's the browser twin of your server's <code class="inline">_sse()</code> helper — that one <em>builds</em> these strings, this one <em>takes them apart</em>:</p>
+<pre class="code">async function* parseSSE(res) {
+  const reader  = res.body.getReader();   <span class="c">// read the response in chunks</span>
+  const decoder = new TextDecoder();      <span class="c">// bytes → text</span>
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    <span class="c">// TODO:</span>
+    <span class="c">// while buffer contains "\n\n":</span>
+    <span class="c">//   • cut everything before it off into `raw`, keep the rest in buffer</span>
+    <span class="c">//   • in raw, the line starting "event: " is the name,</span>
+    <span class="c">//     the line starting "data: " is JSON</span>
+    <span class="c">//   • yield { event, data }</span>
+  }
+}</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+
+      let event = "message";
+      let data = "";
+      for (const line of raw.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7);
+        else if (line.startsWith("data: ")) data = line.slice(6);
+      }
+      if (data) yield { event, data: JSON.parse(data) };
+    }</pre>
+                    <ul class="why">
+                      <li><code class="inline">function*</code> with a <code class="inline">yield</code> is a <strong>generator</strong> — the same idea as your Python <code class="inline">stream_chat</code>. It hands values out one at a time instead of returning once at the end. Your whole stack is now generators end to end: LangGraph → <code class="inline">stream_chat</code> → the SSE endpoint → this parser.</li>
+                      <li><code class="inline">while</code> not <code class="inline">if</code>: one network read can carry several complete events. Drain them all before reading again.</li>
+                      <li><code class="inline">{ stream: true }</code> handles a multi-byte character split across two chunks — without it your € signs arrive as garbage.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Turn events into UI</h4>
+                <p>Replace the temporary <code class="inline">bot.body.textContent = await res.text();</code> line with the real loop:</p>
+<pre class="code">  for await (const { event, data } of parseSSE(res)) {
+    <span class="c">// TODO — one case each:</span>
+    <span class="c">// "agent"      → bot.head.textContent = data.agent</span>
+    <span class="c">// "tool_call"  → create a &lt;span class="chip"&gt; with data.name, append to bot.chips</span>
+    <span class="c">// "text_delta" → bot.body.textContent += data.text</span>
+    <span class="c">// "error"      → bot.body.textContent = "⚠ " + data.message</span>
+  }</pre>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">  for await (const { event, data } of parseSSE(res)) {
+    if (event === "agent") {
+      bot.head.textContent = data.agent;
+    } else if (event === "tool_call") {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = data.name;
+      bot.chips.append(chip);
+    } else if (event === "text_delta") {
+      bot.body.textContent += data.text;
+    } else if (event === "error") {
+      bot.body.textContent = "⚠ " + data.message;
+    }
+  }</pre>
+                    <ul class="why">
+                      <li><code class="inline">for await</code> (not plain <code class="inline">for</code>) because <code class="inline">parseSSE</code> is an async generator — each loop iteration waits for the next event to arrive over the network. This is the line that makes the page <em>live</em>.</li>
+                      <li><code class="inline">data.agent</code> matches the key <em>your</em> API sends: <code class="inline">{"agent": "A01"}</code>. Client and server event shapes are a contract; a typo here fails silently, which is why the original defines them in a shared <span class="mono">types.ts</span>.</li>
+                      <li><code class="inline">+=</code> rather than <code class="inline">=</code> for the text: today your backend sends one delta, but append is already correct for the M5 token-streaming upgrade. Costs nothing now.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Watch it work</h4>
+                <p>Reload <code class="inline">http://localhost:8000</code>, leave the dropdown on AUTO, and ask <em>“What if Summer Stamps ran 6 weeks longer?”</em> The label should become <strong>A02</strong>, chips should appear for <span class="mono">list_campaigns</span> and <span class="mono">forecast_participation</span> <em>as they happen</em>, then the answer arrives.</p>
+                <p class="why"><strong>If it fails</strong> — open the browser console first (F12 → Console). Frontend errors go there, not to your terminal:</p>
+                <ul class="trouble">
+                  <li><code class="inline">app.js 404</code> → the <code class="inline">app.mount("/web", ...)</code> line is missing, or uvicorn wasn't restarted.</li>
+                  <li>Page reloads and clears when you hit Send → <code class="inline">e.preventDefault()</code> is missing.</li>
+                  <li>Nothing happens, console says <code class="inline">null</code> has no property → an <code class="inline">id=</code> in the HTML doesn't match the <code class="inline">getElementById</code> string.</li>
+                  <li>Everything appears at once at the end → you're awaiting the whole body somewhere instead of looping over <code class="inline">parseSSE</code>.</li>
+                </ul>
+<pre class="code">git add . ; git commit -m "M4a: vanilla JS chat page served by FastAPI"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li>In the browser: AUTO routes, tool chips appear <em>during</em> the answer, text arrives after.</li>
+            <li>Picking A01 explicitly and asking a forecast question shows the agent refusing — routing and capability are visibly linked.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M4b -->
+    <div class="milestone">
+      <div class="m-head">
+        <span class="m-badge">M4b</span>
+        <h3>The same page, in React</h3>
+        <span class="m-time">optional · ~1–2 sessions</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label">Concept</span>
+          <div>
+            <p><strong>Optional — do this only if you want to learn React</strong>, or to read the original repo's frontend comfortably. M4a already satisfies the course's definition of done.</p>
+            <p>What React changes: in M4a you told the page <em>how</em> to update (“create this span, append it there”). In React you keep the conversation in <strong>state</strong> and describe what the page should <em>look like</em> for that state; React works out the DOM operations. Same trade you already made in M1b — hand-written steps became a declared graph.</p>
           </div>
         </div>
         <div class="m-row">
@@ -1431,20 +1659,20 @@ data: {}</pre>
 
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"],
                    allow_methods=["*"], allow_headers=["*"])</pre>
-                <p>Do this first — skipping it produces a confusing “Failed to fetch” with no useful detail in the console. Note what CORS is <em>not</em>: it isn't security for your server (anything can call your API with curl); it's the browser protecting <em>users</em> from a page silently calling other sites with their cookies.</p>
+                <p>Do this first — skipping it produces a confusing “Failed to fetch” with no useful detail in the console. Note what CORS is <em>not</em>: it isn't security for your server (anything can call your API with curl); it's the browser protecting <em>users</em> from a page silently calling other sites with their cookies. M4a needed none of this because the page and the API shared an origin.</p>
               </li>
               <li>
                 <h4>Scaffold the React app</h4>
 <pre class="code">cd C:\Users\NazliC\Desktop\repos\mini-agents
-npm create vite@latest web -- --template react-ts
-cd web
+npm create vite@latest web-react -- --template react-ts
+cd web-react
 npm install
 npm run dev</pre>
-                <p>Open <code class="inline">http://localhost:5173</code> — the Vite starter page. You'll replace <span class="mono">src/App.tsx</span> and add two files next to it.</p>
+                <p>Open <code class="inline">http://localhost:5173</code> — the Vite starter page. You'll replace <span class="mono">src/App.tsx</span> and add two files next to it. (Separate folder from M4a's <span class="mono">web/</span>, so both versions keep working.)</p>
               </li>
               <li>
                 <h4>The SSE parser</h4>
-                <span class="filetag">web/src/sseParser.ts</span>
+                <span class="filetag">web-react/src/sseParser.ts</span>
                 <p>An async generator that turns a <code class="inline">fetch</code> response body into <code class="inline">{event, data}</code> objects:</p>
 <pre class="code">export type SSEMessage = { event: string; data: any };
 
@@ -1491,7 +1719,7 @@ export async function* parseSSEStream(res: Response): AsyncGenerator&lt;SSEMessa
               </li>
               <li>
                 <h4>The hook that owns chat state</h4>
-                <span class="filetag">web/src/useChatStream.ts</span>
+                <span class="filetag">web-react/src/useChatStream.ts</span>
 <pre class="code">import { useState } from "react";
 import { parseSSEStream } from "./sseParser";
 
@@ -1565,7 +1793,7 @@ export function useChatStream() {
               </li>
               <li>
                 <h4>The UI</h4>
-                <span class="filetag">web/src/App.tsx</span>
+                <span class="filetag">web-react/src/App.tsx</span>
                 <p>Replace the file entirely. Complete as given — the interesting work was in the hook:</p>
 <pre class="code">import { useState } from "react";
 import { useChatStream } from "./useChatStream";
@@ -1614,14 +1842,14 @@ export default function App() {
               </li>
               <li>
                 <h4>Run both halves</h4>
-                <p>Two terminals: <code class="inline">uvicorn src.api.main:app --reload --port 8000</code> in the repo root, <code class="inline">npm run dev</code> in <span class="mono">web/</span>. Then in the browser, with AUTO selected, ask <em>“What if Summer Stamps ran 6 weeks longer?”</em> — you should see the label read <strong>A02</strong>, chips appear for <span class="mono">list_campaigns</span> and <span class="mono">forecast_participation</span>, then the answer.</p>
+                <p>Two terminals: <code class="inline">uvicorn src.api.main:app --reload --port 8000</code> in the repo root, <code class="inline">npm run dev</code> in <span class="mono">web-react/</span>. Then in the browser at <code class="inline">localhost:5173</code>, with AUTO selected, ask <em>“What if Summer Stamps ran 6 weeks longer?”</em> — you should see the label read <strong>A02</strong>, chips appear for <span class="mono">list_campaigns</span> and <span class="mono">forecast_participation</span>, then the answer. Identical behaviour to M4a, different machinery underneath.</p>
                 <p class="why"><strong>If it fails:</strong></p>
                 <ul class="trouble">
                   <li>Console says CORS / “Failed to fetch” → step 1 wasn't applied, or the server wasn't restarted after editing <span class="mono">main.py</span>.</li>
                   <li>Chips never appear, answer arrives whole → your parser is probably waiting for the stream to finish; check you're yielding inside the <code class="inline">while</code> loop, not after it.</li>
                   <li>Everything logs correctly but the screen never updates → you mutated a message object instead of creating a new one.</li>
                 </ul>
-<pre class="code">git add . ; git commit -m "M4: React chat UI with SSE streaming"</pre>
+<pre class="code">git add . ; git commit -m "M4b: React chat UI with SSE streaming"</pre>
               </li>
             </ol>
           </div>
@@ -1641,22 +1869,53 @@ export default function App() {
     </div>
 
     <!-- M5 -->
-    <div class="milestone">
+    <div class="milestone current">
       <div class="m-head">
         <span class="m-badge">M5</span>
         <h3>Stretch goals — pick any</h3>
+        <span class="m-now">← COURSE COMPLETE · OPTIONAL FROM HERE</span>
         <span class="m-time">optional</span>
       </div>
       <div class="m-body">
         <div class="m-row">
-          <span class="m-label build">Options</span>
+          <span class="m-label">Concept</span>
+          <div><p>The course's definition of done is met — browser chat, AUTO routing, live tool chips, streamed answers. Everything below is optional. They're ordered by how much they teach, not by difficulty; <strong>#1 is the one to do</strong> if you only do one, because it closes a gap you watched happen in M1a.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">1 · Memory</span>
           <div>
+            <p>Remember the very first chat you ran? <em>“What would 4 more weeks do to it?”</em> fired seven tool calls, because “it” meant nothing — every question starts from an empty message list. Fixing that is a genuinely small change with a big payoff.</p>
+            <p><strong>The insight from the Q&amp;A:</strong> the conversation lives in the <code class="inline">state</code> dict, not on the cached agent. So memory means putting prior messages <em>into that dict</em> — nothing about <code class="inline">BaseAgent</code> changes.</p>
+<pre class="code"><span class="c"># base.py — accept prior messages</span>
+def stream_chat(self, user_text: str, history: list | None = None):
+    state = {"messages": (history or []) + [HumanMessage(user_text)]}
+    ...</pre>
+            <p>Then pick where history comes from. Two honest options:</p>
             <ul>
-              <li><strong>Server-side sessions</strong> — SQLite threads table; feed stored history back into the graph.</li>
-              <li><strong>True token streaming</strong> — switch the agent node to <code class="inline">llm.astream</code> and emit real <code class="inline">text_delta</code> chunks. (This actually improves on the original, which streams the final text in one shot.)</li>
-              <li><strong>Second provider</strong> — add Anthropic to <code class="inline">create_llm</code>, completing the factory lesson.</li>
-              <li><strong>A tool with real I/O</strong> — hit a public API and handle failures inside the tool.</li>
+              <li><strong>Client-side</strong> (30 min): the browser keeps the transcript and posts it with each message. Server stays stateless. You'd send <code class="inline">[{role, text}]</code> in the request body and rebuild <code class="inline">HumanMessage</code>/<code class="inline">AIMessage</code> objects server-side.</li>
+              <li><strong>Server-side SQLite</strong> (half a day): a <code class="inline">threads</code> table keyed by <code class="inline">thread_id</code>; the request carries only the id. This is what the original does with Postgres (<span class="mono">src/api/postgres_store.py</span>) and what you need for “reopen yesterday's chat.”</li>
             </ul>
+            <p>Start client-side — it teaches the concept in one sitting, and it makes the trade-off concrete when you later hit its limits (nothing survives a refresh; the payload grows every turn; a user can forge history).</p>
+            <p class="why"><strong>Then notice the new problem:</strong> conversations grow without bound, and every turn re-sends the whole thing. That's the token-cost cliff every production agent hits, and the reason the original has conversation-history tables with trimming rather than one endless list.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">2 · Real streaming</span>
+          <div>
+            <p>Your <code class="inline">text_delta</code> currently carries the whole answer at once — the “stream” only streams <em>progress</em>, not text. Switch the agent node to <code class="inline">llm.astream(...)</code> and yield each chunk as it arrives, and the answer will type itself out word by word.</p>
+            <p>This means making <code class="inline">stream_chat</code> an <strong>async</strong> generator (<code class="inline">async def</code> + <code class="inline">async for</code>), which ripples into the endpoint — that's exactly why the original's method is called <code class="inline">astream_chat_with_tools</code>. Your <code class="inline">app.js</code> already handles it: you wrote <code class="inline">+=</code> instead of <code class="inline">=</code>, so multiple deltas append correctly with no frontend change at all. <strong>You'd be improving on the original</strong>, whose code comments admit it produces the text in one shot.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">3 · Second provider</span>
+          <div>
+            <p>Add Anthropic to <code class="inline">create_llm</code> so <code class="inline">model="claude-sonnet-4-5"</code> returns a <code class="inline">ChatAnthropic</code>. Completes the M0 lesson: one function changes, and 3 agents plus the router keep working untouched. Then set one agent's <code class="inline">model</code> to Claude and watch mixed providers coexist — which is precisely what the original does across its 14 agents.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">4 · A tool with real I/O</span>
+          <div>
+            <p>Every tool you have reads a local JSON file and cannot fail. Add one that calls a public HTTP API (no key needed: <code class="inline">https://api.frankfurter.app/latest?from=EUR&amp;to=GBP</code>) and handle timeouts and non-200s <em>inside</em> the tool, returning a readable error string. Then unplug your network and ask for it — watch the agent read your error message and explain the problem to the user instead of crashing. That's the “tools never raise” rule paying off under real conditions.</p>
           </div>
         </div>
       </div>
@@ -1674,9 +1933,22 @@ export default function App() {
       </ol>
     </div>
     <p style="margin-top:1.25rem">
-      <strong>Definition of done:</strong> the full-stack demo works (browser chat → AUTO routing → visible tool calls → streamed answer),
-      and you can narrate the path of one request through every file you wrote — and point to its twin in
-      <span class="mono">agents_and_connectors</span>.
+      <strong>Definition of done — reached 2026-09-15.</strong> The full-stack demo works: browser chat → AUTO routing → visible tool calls → streamed answer.
+      Every layer was written by hand, and each one has a named twin in <span class="mono">agents_and_connectors</span>:
+    </p>
+<pre class="code">your file                      the original
+─────────────────────────────  ──────────────────────────────────────
+src/config.py                  src/config.py :: create_llm
+src/tools.py                   src/agent/tools/__init__.py
+src/agents/base.py             src/agent/base.py
+src/agents/definitions.py      src/agent/definitions/*.py
+src/agents/registry.py         src/agent/registry.py
+src/agents/router.py           src/agent/router.py
+src/api/chat.py                src/api/chat_routes.py
+web/app.js                     chatkit/app/src/chat/useChatStream.ts</pre>
+    <p>
+      Eight files against a repo of hundreds — because everything else there is production scaffolding
+      (auth, Postgres, Celery, MCP, tracing, connectors), not agent logic. That ratio <em>is</em> the lesson.
     </p>
   </section>
 
@@ -1801,6 +2073,6 @@ iteration 2
   </section>
 
   <footer>
-    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · say “M4 done” in Claude Code to continue
+    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · core course complete — M4b and M5 are optional
   </footer>
 </div>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>mini-agents</title>
+  <style>
+    body   { font-family: system-ui; max-width: 680px; margin: 2rem auto; }
+    .msg   { margin: 1rem 0; }
+    .body  { white-space: pre-wrap; }          /* keep the model's line breaks */
+    .chip  { background: #eef; border-radius: 99px;
+             padding: 2px 8px; margin-left: 6px; font-size: 12px; }
+    form   { display: flex; gap: 8px; }
+    #input { flex: 1; }
+  </style>
+</head>
+<body>
+  <h2>mini-agents</h2>
+
+  <!-- every message gets appended in here -->
+  <div id="messages"></div>
+
+  <!-- id="..." is how JavaScript finds an element -->
+  <form id="chat-form">
+    <select id="agent">
+      <option>AUTO</option><option>A01</option>
+      <option>A02</option><option>A99</option>
+    </select>
+    <input id="input" placeholder="Ask about a campaign…">
+    <button>Send</button>
+  </form>
+
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>
