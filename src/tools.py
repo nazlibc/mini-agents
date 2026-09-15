@@ -1,9 +1,10 @@
 import json
-from pathlib import Path
 from langchain_core.tools import tool
 
+from src.config import BASE_DIR
+
 def _load_campaigns():
-    return json.loads(Path("data/campaigns.json").read_text())
+    return json.loads((BASE_DIR / "data" / "campaigns.json").read_text(encoding="utf-8"))
 
 @tool
 def list_campaigns() -> str:

@@ -1,5 +1,11 @@
+from pathlib import Path
+
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+
+# Repo root, resolved from this file — so data and static paths work no matter
+# which directory the process was started from.
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv() # reads .env → environment variables. Runs once, at import.
 
