@@ -458,7 +458,7 @@
       real repo does the same thing.
     </p>
     <div class="status-row">
-      <span class="chip now"><span class="dot"></span>You are here: M4a — A chat page in plain HTML &amp; JS</span>
+      <span class="chip now"><span class="dot"></span>You are here: M5 — stretch goals (or optional M4b)</span>
       <span class="chip">stack: Python · FastAPI · LangGraph · React</span>
       <span class="chip">LLM: OpenAI API direct</span>
     </div>
@@ -1406,11 +1406,11 @@ data: {}</pre>
     </div>
 
     <!-- M4a -->
-    <div class="milestone current">
+    <div class="milestone finished">
       <div class="m-head">
         <span class="m-badge">M4a</span>
         <h3>A chat page — plain HTML &amp; JavaScript</h3>
-        <span class="m-now">← IN PROGRESS</span>
+        <span class="m-done">✓ DONE</span>
         <span class="m-time">~1 session</span>
       </div>
       <div class="m-body">
@@ -1869,22 +1869,53 @@ export default function App() {
     </div>
 
     <!-- M5 -->
-    <div class="milestone">
+    <div class="milestone current">
       <div class="m-head">
         <span class="m-badge">M5</span>
         <h3>Stretch goals — pick any</h3>
+        <span class="m-now">← COURSE COMPLETE · OPTIONAL FROM HERE</span>
         <span class="m-time">optional</span>
       </div>
       <div class="m-body">
         <div class="m-row">
-          <span class="m-label build">Options</span>
+          <span class="m-label">Concept</span>
+          <div><p>The course's definition of done is met — browser chat, AUTO routing, live tool chips, streamed answers. Everything below is optional. They're ordered by how much they teach, not by difficulty; <strong>#1 is the one to do</strong> if you only do one, because it closes a gap you watched happen in M1a.</p></div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">1 · Memory</span>
           <div>
+            <p>Remember the very first chat you ran? <em>“What would 4 more weeks do to it?”</em> fired seven tool calls, because “it” meant nothing — every question starts from an empty message list. Fixing that is a genuinely small change with a big payoff.</p>
+            <p><strong>The insight from the Q&amp;A:</strong> the conversation lives in the <code class="inline">state</code> dict, not on the cached agent. So memory means putting prior messages <em>into that dict</em> — nothing about <code class="inline">BaseAgent</code> changes.</p>
+<pre class="code"><span class="c"># base.py — accept prior messages</span>
+def stream_chat(self, user_text: str, history: list | None = None):
+    state = {"messages": (history or []) + [HumanMessage(user_text)]}
+    ...</pre>
+            <p>Then pick where history comes from. Two honest options:</p>
             <ul>
-              <li><strong>Server-side sessions</strong> — SQLite threads table; feed stored history back into the graph.</li>
-              <li><strong>True token streaming</strong> — switch the agent node to <code class="inline">llm.astream</code> and emit real <code class="inline">text_delta</code> chunks. (This actually improves on the original, which streams the final text in one shot.)</li>
-              <li><strong>Second provider</strong> — add Anthropic to <code class="inline">create_llm</code>, completing the factory lesson.</li>
-              <li><strong>A tool with real I/O</strong> — hit a public API and handle failures inside the tool.</li>
+              <li><strong>Client-side</strong> (30 min): the browser keeps the transcript and posts it with each message. Server stays stateless. You'd send <code class="inline">[{role, text}]</code> in the request body and rebuild <code class="inline">HumanMessage</code>/<code class="inline">AIMessage</code> objects server-side.</li>
+              <li><strong>Server-side SQLite</strong> (half a day): a <code class="inline">threads</code> table keyed by <code class="inline">thread_id</code>; the request carries only the id. This is what the original does with Postgres (<span class="mono">src/api/postgres_store.py</span>) and what you need for “reopen yesterday's chat.”</li>
             </ul>
+            <p>Start client-side — it teaches the concept in one sitting, and it makes the trade-off concrete when you later hit its limits (nothing survives a refresh; the payload grows every turn; a user can forge history).</p>
+            <p class="why"><strong>Then notice the new problem:</strong> conversations grow without bound, and every turn re-sends the whole thing. That's the token-cost cliff every production agent hits, and the reason the original has conversation-history tables with trimming rather than one endless list.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">2 · Real streaming</span>
+          <div>
+            <p>Your <code class="inline">text_delta</code> currently carries the whole answer at once — the “stream” only streams <em>progress</em>, not text. Switch the agent node to <code class="inline">llm.astream(...)</code> and yield each chunk as it arrives, and the answer will type itself out word by word.</p>
+            <p>This means making <code class="inline">stream_chat</code> an <strong>async</strong> generator (<code class="inline">async def</code> + <code class="inline">async for</code>), which ripples into the endpoint — that's exactly why the original's method is called <code class="inline">astream_chat_with_tools</code>. Your <code class="inline">app.js</code> already handles it: you wrote <code class="inline">+=</code> instead of <code class="inline">=</code>, so multiple deltas append correctly with no frontend change at all. <strong>You'd be improving on the original</strong>, whose code comments admit it produces the text in one shot.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">3 · Second provider</span>
+          <div>
+            <p>Add Anthropic to <code class="inline">create_llm</code> so <code class="inline">model="claude-sonnet-4-5"</code> returns a <code class="inline">ChatAnthropic</code>. Completes the M0 lesson: one function changes, and 3 agents plus the router keep working untouched. Then set one agent's <code class="inline">model</code> to Claude and watch mixed providers coexist — which is precisely what the original does across its 14 agents.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label build">4 · A tool with real I/O</span>
+          <div>
+            <p>Every tool you have reads a local JSON file and cannot fail. Add one that calls a public HTTP API (no key needed: <code class="inline">https://api.frankfurter.app/latest?from=EUR&amp;to=GBP</code>) and handle timeouts and non-200s <em>inside</em> the tool, returning a readable error string. Then unplug your network and ask for it — watch the agent read your error message and explain the problem to the user instead of crashing. That's the “tools never raise” rule paying off under real conditions.</p>
           </div>
         </div>
       </div>
@@ -1902,9 +1933,22 @@ export default function App() {
       </ol>
     </div>
     <p style="margin-top:1.25rem">
-      <strong>Definition of done:</strong> the full-stack demo works (browser chat → AUTO routing → visible tool calls → streamed answer),
-      and you can narrate the path of one request through every file you wrote — and point to its twin in
-      <span class="mono">agents_and_connectors</span>.
+      <strong>Definition of done — reached 2026-09-15.</strong> The full-stack demo works: browser chat → AUTO routing → visible tool calls → streamed answer.
+      Every layer was written by hand, and each one has a named twin in <span class="mono">agents_and_connectors</span>:
+    </p>
+<pre class="code">your file                      the original
+─────────────────────────────  ──────────────────────────────────────
+src/config.py                  src/config.py :: create_llm
+src/tools.py                   src/agent/tools/__init__.py
+src/agents/base.py             src/agent/base.py
+src/agents/definitions.py      src/agent/definitions/*.py
+src/agents/registry.py         src/agent/registry.py
+src/agents/router.py           src/agent/router.py
+src/api/chat.py                src/api/chat_routes.py
+web/app.js                     chatkit/app/src/chat/useChatStream.ts</pre>
+    <p>
+      Eight files against a repo of hundreds — because everything else there is production scaffolding
+      (auth, Postgres, Celery, MCP, tracing, connectors), not agent logic. That ratio <em>is</em> the lesson.
     </p>
   </section>
 
@@ -2029,6 +2073,6 @@ iteration 2
   </section>
 
   <footer>
-    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · say “M4a done” in Claude Code to continue
+    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · core course complete — M4b and M5 are optional
   </footer>
 </div>
