@@ -458,7 +458,7 @@
       real repo does the same thing.
     </p>
     <div class="status-row">
-      <span class="chip now"><span class="dot"></span>You are here: M5 — stretch goals (or optional M4b)</span>
+      <span class="chip now"><span class="dot"></span>You are here: M5 — conversation memory</span>
       <span class="chip">stack: Python · FastAPI · LangGraph · React</span>
       <span class="chip">LLM: OpenAI API direct</span>
     </div>
@@ -1872,31 +1872,150 @@ export default function App() {
     <div class="milestone current">
       <div class="m-head">
         <span class="m-badge">M5</span>
-        <h3>Stretch goals — pick any</h3>
-        <span class="m-now">← COURSE COMPLETE · OPTIONAL FROM HERE</span>
-        <span class="m-time">optional</span>
+        <h3>Conversation memory</h3>
+        <span class="m-now">← IN PROGRESS</span>
+        <span class="m-time">~1 session</span>
       </div>
       <div class="m-body">
         <div class="m-row">
           <span class="m-label">Concept</span>
-          <div><p>The course's definition of done is met — browser chat, AUTO routing, live tool chips, streamed answers. Everything below is optional. They're ordered by how much they teach, not by difficulty; <strong>#1 is the one to do</strong> if you only do one, because it closes a gap you watched happen in M1a.</p></div>
+          <div>
+            <p><strong>There is no memory.</strong> An LLM is a pure function: messages in, message out. It remembers nothing between calls — not within a conversation, not within a single one of your tool loops. What looks like memory is you <em>re-sending the whole transcript every time</em>.</p>
+            <p>You've already seen both halves of this. Within one question, your loop re-sends the growing message list each iteration — that's how the model "remembers" what a tool returned. Between questions, you build a fresh list, so it remembers nothing — which is why <em>“What would 4 more weeks do to it?”</em> fired seven tool calls in your very first session: “it” referred to nothing, so the model hedged by forecasting everything.</p>
+            <p>So memory is not a feature you add to the agent. It's a decision about <strong>what to put in the list before the new question</strong>. Per the Q&amp;A: the conversation lives in the <code class="inline">state</code> dict, never on the cached <code class="inline">BaseAgent</code> — so nothing about the agent class changes.</p>
+          </div>
         </div>
         <div class="m-row">
-          <span class="m-label build">1 · Memory</span>
+          <span class="m-label build">Walkthrough</span>
           <div>
-            <p>Remember the very first chat you ran? <em>“What would 4 more weeks do to it?”</em> fired seven tool calls, because “it” meant nothing — every question starts from an empty message list. Fixing that is a genuinely small change with a big payoff.</p>
-            <p><strong>The insight from the Q&amp;A:</strong> the conversation lives in the <code class="inline">state</code> dict, not on the cached agent. So memory means putting prior messages <em>into that dict</em> — nothing about <code class="inline">BaseAgent</code> changes.</p>
-<pre class="code"><span class="c"># base.py — accept prior messages</span>
-def stream_chat(self, user_text: str, history: list | None = None):
+            <p style="margin-bottom:.8rem">Branch: <code class="inline">feature/conversation-history</code>. Client-side first — the server stays stateless, and you'll feel the limits yourself before reaching for a database.</p>
+            <ol class="step-list">
+              <li>
+                <h4>Let the agent accept prior messages</h4>
+                <span class="filetag">src/agents/base.py</span>
+<pre class="code">def stream_chat(self, user_text: str, history: list | None = None):
     state = {"messages": (history or []) + [HumanMessage(user_text)]}
+    ...  <span class="c"># rest unchanged</span></pre>
+                <p>That's the entire agent-side change. Everything downstream — the graph, the tool loop, <code class="inline">add_messages</code> — already handles a longer list; it never cared how the list got there.</p>
+              </li>
+              <li>
+                <h4>Accept history in the request</h4>
+                <span class="filetag">src/api/chat.py</span>
+                <p>The wire format can't carry Python objects, so the browser sends plain dicts and you rebuild message objects server-side:</p>
+<pre class="code">from langchain_core.messages import HumanMessage, AIMessage
+
+class ChatRequest(BaseModel):
+    message: str
+    agent: str = "AUTO"
+    history: list[dict] = []        <span class="c"># [{"type": "human"|"ai", "content": "..."}]</span>
+
+def _to_messages(history: list[dict]) -&gt; list:
+    <span class="c"># TODO: map each dict to HumanMessage/AIMessage; skip unknown types</span>
     ...</pre>
-            <p>Then pick where history comes from. Two honest options:</p>
-            <ul>
-              <li><strong>Client-side</strong> (30 min): the browser keeps the transcript and posts it with each message. Server stays stateless. You'd send <code class="inline">[{role, text}]</code> in the request body and rebuild <code class="inline">HumanMessage</code>/<code class="inline">AIMessage</code> objects server-side.</li>
-              <li><strong>Server-side SQLite</strong> (half a day): a <code class="inline">threads</code> table keyed by <code class="inline">thread_id</code>; the request carries only the id. This is what the original does with Postgres (<span class="mono">src/api/postgres_store.py</span>) and what you need for “reopen yesterday's chat.”</li>
-            </ul>
-            <p>Start client-side — it teaches the concept in one sitting, and it makes the trade-off concrete when you later hit its limits (nothing survives a refresh; the payload grows every turn; a user can forge history).</p>
-            <p class="why"><strong>Then notice the new problem:</strong> conversations grow without bound, and every turn re-sends the whole thing. That's the token-cost cliff every production agent hits, and the reason the original has conversation-history tables with trimming rather than one endless list.</p>
+                <p>Then pass it through: <code class="inline">agent.stream_chat(req.message, _to_messages(req.history))</code>.</p>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">def _to_messages(history: list[dict]) -&gt; list:
+    out = []
+    for m in history:
+        if m.get("type") == "human":
+            out.append(HumanMessage(content=m.get("content", "")))
+        elif m.get("type") == "ai":
+            out.append(AIMessage(content=m.get("content", "")))
+    return out</pre>
+                    <ul class="why">
+                      <li><strong>Skip unknown types rather than raising.</strong> This is untrusted input — anything can POST to your endpoint. Same instinct as tools never raising.</li>
+                      <li>This is line-for-line what the original does when rehydrating from Postgres (<span class="mono">chatkit_server.py:737-753</span>) — including silently dropping anything that isn't <code class="inline">human</code> or <code class="inline">ai</code>.</li>
+                    </ul>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>Keep the transcript in the browser</h4>
+                <span class="filetag">web/app.js</span>
+                <p>One array at the top, two pushes, one extra field in the request body:</p>
+<pre class="code">const history = [];   <span class="c">// [{type, content}] — grows as you chat</span>
+
+<span class="c">// in the submit handler, before fetch:</span>
+<span class="c">//   body: JSON.stringify({ message: text, agent: agentEl.value, history })</span>
+
+<span class="c">// TODO: after the stream finishes, record BOTH sides of the turn:</span>
+<span class="c">//   history.push({ type: "human", content: text });</span>
+<span class="c">//   history.push({ type: "ai", content: &lt;the assistant text you accumulated&gt; });</span></pre>
+                <p>Note the ordering trap: push the human message <em>after</em> the stream completes, alongside the AI reply — if you push it before the fetch, you'll send the current question twice (once in <code class="inline">history</code>, once as <code class="inline">message</code>) and the model will see it duplicated.</p>
+                <details class="solution">
+                  <summary>▸ show the code + why</summary>
+                  <div class="sol-body">
+<pre class="code">  let answer = "";
+  for await (const { event, data } of parseSSE(res)) {
+    ...
+    } else if (event === "text_delta") {
+      answer += data.text;              <span class="c">// accumulate for history</span>
+      bot.body.textContent += data.text;
+    }
+    ...
+  }
+
+  history.push({ type: "human", content: text });
+  history.push({ type: "ai", content: answer });</pre>
+                    <p class="why">Track <code class="inline">answer</code> separately rather than reading <code class="inline">bot.body.textContent</code> back out of the DOM — the DOM is for display, not storage. Reading state back out of your UI is a habit that breaks the moment you render anything (a “⚠” prefix, markdown, a spinner).</p>
+                  </div>
+                </details>
+              </li>
+              <li>
+                <h4>The pronoun test</h4>
+                <p>Restart, reload, and run the exact exchange that failed in M1a:</p>
+                <ul class="why" style="list-style: disc;">
+                  <li><em>“What's the participation of Winter Loyalty?”</em> → 41%</li>
+                  <li><em>“What would 4 more weeks do to it?”</em> → should now resolve <strong>“it” = Winter Loyalty</strong>, call <span class="mono">forecast_participation</span> once with <code class="inline">C003</code>, and answer ~44%.</li>
+                </ul>
+                <p>Compare the chip count with your first-ever run: seven tool calls then, one now. That gap is what memory buys — and it's a cost saving as much as a quality one.</p>
+                <p class="why"><strong>Watch for this:</strong> with AUTO routing, question 2 may now route to A02 while question 1 went to A01. History crosses agents — the transcript is the <em>thread's</em>, not the agent's. That's deliberate here, and it's exactly why the original constrains AUTO to lifecycle groups: handing one agent's conversation to a differently-scoped agent can confuse it.</p>
+<pre class="code">git add . ; git commit -m "M5: client-side conversation history"</pre>
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label">How the<br>original<br>does it</span>
+          <div>
+            <p>Worth reading once you have yours working — it made three decisions you'll now recognise as decisions rather than inevitabilities (<span class="mono">src/api/postgres_store.py</span>, <span class="mono">src/api/chatkit_server.py:865-876</span>):</p>
+            <p><strong>1. It stores a flattened transcript, not the real message list.</strong> Each turn is reduced to two records — the user's text and the <em>final</em> assistant text. The <code class="inline">AIMessage</code>s carrying tool_calls and their <code class="inline">ToolMessage</code> results are shown live in the UI and then <em>thrown away</em>:</p>
+<pre class="code">history_data.append({"type": "human", "content": user_text})
+history_data.append({"type": "ai", "content": response_text})</pre>
+            <p>The trade-off: cheap and safe — and it sidesteps the 400-error trap from your M1a Q&amp;A, since a flattened list can never contain a <code class="inline">ToolMessage</code> orphaned from its request. The cost is that next turn the model <em>cannot see what a tool returned</em> unless that detail survived into the prose answer, so it re-calls tools it already ran. Your client-side version inherits exactly this design.</p>
+            <p><strong>2. One row per thread, not per message.</strong> <code class="inline">thread_id</code> is <code class="inline">unique=True</code> and the whole conversation is one JSON blob that's read, mutated, and rewritten every turn. Simple; not what you'd want with concurrent writers.</p>
+            <p><strong>3. A hard 20-message window, enforced at write time.</strong></p>
+<pre class="code">if len(history_data) &gt; 20:
+    history_data = history_data[-20:]</pre>
+            <p>Note <em>write</em> time: older messages are permanently deleted, not merely skipped on replay. There's no token counting and no summarisation — ten turns, then the beginning is gone forever. Defensible for a chat tool; it would be a bug in a system where the first message sets up the whole task.</p>
+            <p class="why"><strong>And a callback to the M1b question you got wrong:</strong> the system prompt is <em>never</em> stored — the rehydration loop has no <code class="inline">system</code> branch at all. So even in production, that <code class="inline">isinstance(..., SystemMessage)</code> check in <code class="inline">agent_node</code> never fires. It's defensive code guarding a case that doesn't occur.</p>
+          </div>
+        </div>
+        <div class="m-row">
+          <span class="m-label verify">Verify</span>
+          <div><ul class="check">
+            <li>The pronoun test passes: “it” resolves to the campaign from the previous turn.</li>
+            <li>Refreshing the page loses the conversation — confirm it, and know <em>why</em> (the transcript lives only in a JavaScript variable).</li>
+            <li>You can state what your history does <em>not</em> contain, and what that costs.</li>
+          </ul></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- M6 -->
+    <div class="milestone">
+      <div class="m-head">
+        <span class="m-badge">M6</span>
+        <h3>Further stretch goals — pick any</h3>
+        <span class="m-time">optional</span>
+      </div>
+      <div class="m-body">
+        <div class="m-row">
+          <span class="m-label build">1 · Durable history</span>
+          <div>
+            <p>Move the transcript server-side: a SQLite <code class="inline">threads</code> table keyed by <code class="inline">thread_id</code>, with the request carrying only the id. Now conversations survive a refresh, and a user can't forge history by editing the payload. This is the original's design (Postgres instead of SQLite) — and the point where you'd add trimming, because the payload is no longer self-limiting by being annoying to send.</p>
           </div>
         </div>
         <div class="m-row">
@@ -1907,7 +2026,7 @@ def stream_chat(self, user_text: str, history: list | None = None):
           </div>
         </div>
         <div class="m-row">
-          <span class="m-label build">3 · Second provider</span>
+          <span class="m-label build">3 · Provider swap</span>
           <div>
             <p>Add Anthropic to <code class="inline">create_llm</code> so <code class="inline">model="claude-sonnet-4-5"</code> returns a <code class="inline">ChatAnthropic</code>. Completes the M0 lesson: one function changes, and 3 agents plus the router keep working untouched. Then set one agent's <code class="inline">model</code> to Claude and watch mixed providers coexist — which is precisely what the original does across its 14 agents.</p>
           </div>
@@ -2073,6 +2192,6 @@ iteration 2
   </section>
 
   <footer>
-    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · core course complete — M4b and M5 are optional
+    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · core course complete — now on M5, conversation memory
   </footer>
 </div>
