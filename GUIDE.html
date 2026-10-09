@@ -458,7 +458,7 @@
       real repo does the same thing.
     </p>
     <div class="status-row">
-      <span class="chip now"><span class="dot"></span>You are here: M5 — conversation memory</span>
+      <span class="chip now"><span class="dot"></span>You are here: M6 — further stretch goals</span>
       <span class="chip">stack: Python · FastAPI · LangGraph · React</span>
       <span class="chip">LLM: OpenAI API direct</span>
     </div>
@@ -1869,11 +1869,11 @@ export default function App() {
     </div>
 
     <!-- M5 -->
-    <div class="milestone current">
+    <div class="milestone finished">
       <div class="m-head">
         <span class="m-badge">M5</span>
         <h3>Conversation memory</h3>
-        <span class="m-now">← IN PROGRESS</span>
+        <span class="m-done">✓ DONE</span>
         <span class="m-time">~1 session</span>
       </div>
       <div class="m-body">
@@ -1971,6 +1971,7 @@ def _to_messages(history: list[dict]) -&gt; list:
                   <li><em>“What would 4 more weeks do to it?”</em> → should now resolve <strong>“it” = Winter Loyalty</strong>, call <span class="mono">forecast_participation</span> once with <code class="inline">C003</code>, and answer ~44%.</li>
                 </ul>
                 <p>Compare the chip count with your first-ever run: seven tool calls then, one now. That gap is what memory buys — and it's a cost saving as much as a quality one.</p>
+                <p><strong>What actually happened (2026-10-09):</strong> question 1 → A01, <span class="mono">list_campaigns</span> + <span class="mono">get_campaign_stats</span>, “41%”. Question 2 → <strong>A02</strong>, <span class="mono">list_campaigns</span> + <span class="mono">forecast_participation</span>, “would increase to 44%”. “It” resolved correctly: two tool calls instead of seven. The extra <span class="mono">list_campaigns</span> is the flattened-transcript cost described below — the stored answer says “Winter Loyalty” but never <code class="inline">C003</code>, so A02 had to look the id up again.</p>
                 <p class="why"><strong>Watch for this:</strong> with AUTO routing, question 2 may now route to A02 while question 1 went to A01. History crosses agents — the transcript is the <em>thread's</em>, not the agent's. That's deliberate here, and it's exactly why the original constrains AUTO to lifecycle groups: handing one agent's conversation to a differently-scoped agent can confuse it.</p>
 <pre class="code">git add . ; git commit -m "M5: client-side conversation history"</pre>
               </li>
@@ -2005,10 +2006,11 @@ history_data.append({"type": "ai", "content": response_text})</pre>
     </div>
 
     <!-- M6 -->
-    <div class="milestone">
+    <div class="milestone current">
       <div class="m-head">
         <span class="m-badge">M6</span>
         <h3>Further stretch goals — pick any</h3>
+        <span class="m-now">← OPTIONAL FROM HERE</span>
         <span class="m-time">optional</span>
       </div>
       <div class="m-body">
@@ -2192,6 +2194,6 @@ iteration 2
   </section>
 
   <footer>
-    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · core course complete — now on M5, conversation memory
+    mini-agents guided build · reference repo: <span class="mono">agents_and_connectors</span> · core course + M5 memory complete — M6 stretch goals optional
   </footer>
 </div>
