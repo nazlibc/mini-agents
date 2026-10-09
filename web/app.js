@@ -3,6 +3,7 @@ const messagesEl = document.getElementById("messages");
 const formEl     = document.getElementById("chat-form");
 const inputEl    = document.getElementById("input");
 const agentEl    = document.getElementById("agent");
+const history = [];   // [{type, content}] — grows as you chat
 
 // 2. CREATE a message block; returns handles so we can fill it in later
 function addMessage(who) {
@@ -57,9 +58,10 @@ formEl.addEventListener("submit", async (e) => {
   const res = await fetch("/api/chat/stream", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ message: text, agent: agentEl.value }),
+    body:    JSON.stringify({ message: text, agent: agentEl.value, history }),
   });
 
+  let answer = "";
     for await (const { event, data } of parseSSE(res)) {
     if (event === "agent") {
       bot.head.textContent = data.agent;} 
@@ -69,9 +71,15 @@ formEl.addEventListener("submit", async (e) => {
         chip.textContent = data.name;
         bot.chips.append(chip);} 
     else if (event === "text_delta") {
-        bot.body.textContent += data.text;} 
+        answer += data.text;              // accumulate for history
+        bot.body.textContent += data.text;}
     else if (event === "error") {
         bot.body.textContent = "⚠ " + data.message;
     }
-  }   
+  }
+
+  // record BOTH sides of the turn only after the stream finishes,
+  // otherwise the current question would be sent twice
+  history.push({ type: "human", content: text });
+  history.push({ type: "ai", content: answer });
 });

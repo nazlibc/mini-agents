@@ -90,8 +90,8 @@ class BaseAgent:
         # 4. add conditional edges from "agent" via should_continue → {"tools": "tools", END: END}
         # 5. add an edge "tools" → "agent"   (the loop back!)
 
-    def stream_chat(self, user_text: str):
-        state = {"messages": [HumanMessage(user_text)]}
+    def stream_chat(self, user_text: str, history: list | None = None):
+        state = {"messages": (history or []) + [HumanMessage(user_text)]}
         for update in self.graph.stream(state, stream_mode="updates"):
             for node_name, node_out in update.items():
                 for msg in node_out["messages"]:
