@@ -1,0 +1,2320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Work Study Guide</title>
+<meta name="description" content="How the My work feature of agents_and_connectors is built (tasks, the store, time zones, the API, the background runner, agent tools, repeats, ports and adapters, the standup, the Claude Code hook and the page), with a build plan that adds a practice planner to Ciao Tutor.">
+<style>
+  :root {
+    --top-h: 60px;
+    --bg: #f7f9f9;
+    --panel: #ffffff;
+    --ink: #1c2528;
+    --ink-soft: #4d5c61;
+    --ink-faint: #7e8d92;
+    --line: #dde5e6;
+    --accent: #0e7570;
+    --accent-soft: #e2f0ef;
+    --amber: #a05a0a;
+    --amber-soft: #f6ecdd;
+    --rose: #a1343b;
+    --rose-soft: #f8e5e6;
+    --code-bg: #14201f;
+    --code-ink: #d4e4e2;
+    --code-accent: #7fd6c8;
+    --code-str: #e6c07b;
+    --code-com: #6d8583;
+    --done: #3d7a46;
+    --shadow: 0 1px 2px rgba(28,37,40,.05), 0 4px 14px rgba(28,37,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101819;
+      --panel: #172122;
+      --ink: #e3ecec;
+      --ink-soft: #a7b7b8;
+      --ink-faint: #6f8081;
+      --line: #263334;
+      --accent: #4cc3b6;
+      --accent-soft: #12302e;
+      --amber: #e0a45c;
+      --amber-soft: #33260f;
+      --rose: #e08a90;
+      --rose-soft: #3a1a1d;
+      --code-bg: #0b1414;
+      --code-ink: #cfe0de;
+      --code-accent: #6fcabd;
+      --code-str: #e6c07b;
+      --code-com: #6d8583;
+      --done: #7dbb86;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101819;
+    --panel: #172122;
+    --ink: #e3ecec;
+    --ink-soft: #a7b7b8;
+    --ink-faint: #6f8081;
+    --line: #263334;
+    --accent: #4cc3b6;
+    --accent-soft: #12302e;
+    --amber: #e0a45c;
+    --amber-soft: #33260f;
+    --rose: #e08a90;
+    --rose-soft: #3a1a1d;
+    --code-bg: #0b1414;
+    --code-ink: #cfe0de;
+    --code-accent: #6fcabd;
+    --code-str: #e6c07b;
+    --code-com: #6d8583;
+    --done: #7dbb86;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .mono, code, pre, kbd { font-family: "Cascadia Code", Consolas, "SF Mono", Menlo, monospace; }
+
+  /* ---------- layout ---------- */
+  .app:not(.box) {
+    display: grid;
+    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-rows: var(--top-h) 1fr;
+    min-height: 100vh;
+  }
+  header.top {
+    grid-column: 1 / -1;
+    position: sticky; top: 0; z-index: 20;
+    height: var(--top-h);
+    display: flex; align-items: center; gap: .9rem;
+    padding: 0 1.1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; flex: 1; }
+  .brand .eyebrow { margin: 0 0 .15rem; }
+  .brand strong { font-weight: 650; font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top-right { display: flex; align-items: center; gap: .7rem; flex-shrink: 0; }
+  .progress { width: 120px; height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
+  .progress .bar { height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+  .progress-label { font-family: "Cascadia Code", Consolas, monospace; font-size: .75rem; color: var(--ink-faint); white-space: nowrap; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    cursor: pointer; font-size: 1rem;
+  }
+  .icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+  .menu-btn { display: none; }
+
+  nav.side {
+    position: sticky; top: var(--top-h);
+    height: calc(100vh - var(--top-h));
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    padding: .9rem .7rem 2.5rem;
+  }
+  .toc { list-style: none; margin: 0; padding: 0; }
+  .toc li.group {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .68rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: .9rem .6rem .35rem;
+  }
+  .toc li.group:first-child { padding-top: .3rem; }
+  .toc a {
+    display: flex; gap: .6rem; align-items: baseline;
+    padding: .42rem .6rem; border-radius: 8px;
+    color: var(--ink-soft); text-decoration: none; font-size: .9rem; line-height: 1.3;
+  }
+  .toc a:hover { background: var(--bg); color: var(--ink); }
+  .toc a .n {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; color: var(--ink-faint); min-width: 1.5rem; flex-shrink: 0;
+  }
+  .toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .toc a.active .n { color: var(--accent); }
+  .toc li.done a .n { color: var(--done); }
+  .toc li.done a .n::after { content: " ✓"; }
+
+  main.content { padding: 2.1rem 2rem 5rem; min-width: 0; }
+  .inner { max-width: 820px; margin: 0 auto; }
+  section.sec { display: none; }
+  section.sec.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .scrim { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 25; }
+  .scrim.show { display: block; }
+
+  @media (max-width: 920px) {
+    .app:not(.box) { grid-template-columns: minmax(0, 1fr); }
+    nav.side {
+      position: fixed; left: 0; top: var(--top-h); bottom: 0; width: 290px; max-width: 86vw;
+      transform: translateX(-100%); transition: transform .2s ease; z-index: 30;
+      box-shadow: var(--shadow);
+    }
+    nav.side.open { transform: none; }
+    .menu-btn { display: inline-flex; }
+    main.content { padding: 1.5rem 16px 4rem; }
+    .progress { width: 70px; }
+    .brand .eyebrow { display: none; }
+  }
+  @media (max-width: 560px) {
+    .progress-label { display: none; }
+  }
+
+  /* ---------- typography ---------- */
+  .eyebrow {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .6rem;
+  }
+  h1 {
+    font-size: clamp(1.7rem, 3.6vw, 2.3rem);
+    line-height: 1.15; margin: 0 0 .6rem;
+    letter-spacing: -.02em; font-weight: 650; text-wrap: balance;
+  }
+  h1 .sec-num {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .78rem; color: var(--ink-faint); display: block;
+    letter-spacing: .12em; margin-bottom: .4rem; font-weight: 500;
+  }
+  .lede { color: var(--ink-soft); font-size: 1.06rem; max-width: 44rem; margin: 0 0 1.4rem; }
+  h2 { font-size: 1.3rem; letter-spacing: -.01em; margin: 2.4rem 0 .6rem; font-weight: 650; text-wrap: balance; }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 .4rem; font-weight: 650; }
+  p { max-width: 44rem; margin: .7rem 0; }
+  ul, ol { max-width: 44rem; padding-left: 1.3rem; }
+  li { margin: .3rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  strong { font-weight: 650; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+  kbd {
+    font-size: .8em; padding: .1em .45em; border-radius: 5px;
+    border: 1px solid var(--line); border-bottom-width: 2px; background: var(--bg); color: var(--ink);
+  }
+
+  /* ---------- boxes ---------- */
+  .tldr, .box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 1rem 1.3rem;
+    box-shadow: var(--shadow);
+    margin: 1.3rem 0;
+  }
+  .tldr .label, .box .label {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--accent); display: block; margin-bottom: .45rem;
+  }
+  .tldr ul { margin: 0; padding-left: 1.2rem; }
+  .tldr li { margin: .3rem 0; }
+  .box p:first-of-type { margin-top: 0; }
+  .box p:last-child, .box ul:last-child, .box ol:last-child, .box pre:last-child { margin-bottom: 0; }
+  .box.app { border-left-color: #2b7a3e; }
+  .box.app .label { color: #2b7a3e; }
+  :root[data-theme="dark"] .box.app, :root:not([data-theme="light"]) .box.app { border-left-color: #7dbb86; }
+  :root[data-theme="dark"] .box.app .label { color: #7dbb86; }
+  .box.warn { border-left-color: var(--amber); }
+  .box.warn .label { color: var(--amber); }
+  .box.idea { border-left-color: var(--rose); background: var(--panel); }
+  .box.idea .label { color: var(--rose); }
+  .box.idea p { font-size: 1.04rem; }
+
+  /* ---------- cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .8rem; margin: 1.2rem 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: .95rem 1.1rem;
+  }
+  .card h3 { margin: 0 0 .3rem; font-size: .98rem; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: .93rem; }
+  .card .tag {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); display: block; margin-bottom: .3rem;
+  }
+
+  /* ---------- tables ---------- */
+  .tw { overflow-x: auto; margin: 1.1rem 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  table.t { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  table.t th, table.t td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.t th {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600; background: var(--bg);
+  }
+  table.t tr:last-child td { border-bottom: 0; }
+  table.t td.k { font-weight: 600; }
+
+  /* ---------- code ---------- */
+  pre.code {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 10px; padding: 1rem 1.2rem;
+    overflow-x: auto; font-size: .83rem; line-height: 1.6; margin: .9rem 0;
+    tab-size: 4;
+  }
+  pre.code .c { color: var(--code-com); font-style: italic; }
+  pre.code .k { color: var(--code-accent); }
+  pre.code .s { color: var(--code-str); }
+  code.inline {
+    font-size: .85em; background: var(--accent-soft); color: var(--accent);
+    padding: .1em .4em; border-radius: 5px;
+  }
+  .prompt {
+    position: relative; margin: 1rem 0;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    box-shadow: var(--shadow);
+  }
+  .prompt .plabel {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .68rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--amber); padding: .6rem 1rem 0;
+    display: block;
+  }
+  .prompt pre {
+    margin: 0; padding: .5rem 1rem .9rem; white-space: pre-wrap; word-break: break-word;
+    font-size: .84rem; line-height: 1.55; color: var(--ink);
+  }
+  .prompt .copy {
+    position: absolute; top: .45rem; right: .5rem;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: .72rem;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink-soft);
+    border-radius: 6px; padding: .2rem .55rem; cursor: pointer;
+  }
+  .prompt .copy:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- lists ---------- */
+  ol.steps { list-style: none; padding-left: 0; counter-reset: step; margin: 1rem 0; }
+  ol.steps > li {
+    counter-increment: step; position: relative; padding-left: 2.4rem; margin: .7rem 0;
+  }
+  ol.steps > li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute; left: 0; top: .15rem;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: .78rem; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: .05rem .4rem;
+  }
+  ul.check { list-style: none; padding-left: 0; }
+  ul.check li { display: flex; gap: .6rem; align-items: baseline; }
+  ul.check li::before { content: "☐"; color: var(--amber); flex-shrink: 0; }
+  .pill {
+    display: inline-block; font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; letter-spacing: .06em; padding: .12rem .5rem; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink-soft); vertical-align: middle;
+  }
+  .pill.code { color: var(--accent); border-color: var(--accent); }
+  .pill.model { color: var(--amber); border-color: var(--amber); }
+
+  /* ---------- quiz ---------- */
+  details.qa {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: .7rem 1rem; margin: .6rem 0;
+  }
+  details.qa summary { cursor: pointer; font-weight: 600; list-style: none; }
+  details.qa summary::-webkit-details-marker { display: none; }
+  details.qa summary::before { content: "▸ "; color: var(--accent); }
+  details[open].qa summary::before { content: "▾ "; }
+  details.qa p, details.qa ul { margin: .5rem 0 0; color: var(--ink-soft); }
+
+  /* ---------- diagrams ---------- */
+  .diagram {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: .8rem; margin: 1.1rem 0; overflow-x: auto; box-shadow: var(--shadow);
+  }
+  .diagram svg { display: block; width: 100%; height: auto; max-width: 780px; margin: 0 auto; font-family: "Segoe UI", system-ui, sans-serif; }
+  .diagram .cap { font-size: .84rem; color: var(--ink-faint); text-align: center; margin: .5rem 0 0; }
+  .d-box { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+  .d-box.hi { fill: var(--accent-soft); stroke: var(--accent); }
+  .d-box.warm { fill: var(--amber-soft); stroke: var(--amber); }
+  .d-text { fill: var(--ink); font-size: 13px; }
+  .d-text.sm { font-size: 11px; fill: var(--ink-soft); }
+  .d-text.mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .d-line { stroke: var(--ink-soft); stroke-width: 1.4; fill: none; }
+  .d-line.hi { stroke: var(--accent); }
+  .d-line.warm { stroke: var(--amber); }
+  .d-arrow { fill: var(--ink-soft); }
+  .d-arrow.hi { fill: var(--accent); }
+  .d-arrow.warm { fill: var(--amber); }
+
+  /* ---------- section footer ---------- */
+  .sec-foot {
+    margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  }
+  .sec-foot .done-toggle {
+    display: inline-flex; align-items: center; gap: .5rem; cursor: pointer;
+    font-size: .92rem; color: var(--ink-soft); user-select: none;
+  }
+  .sec-foot .done-toggle input { width: 1rem; height: 1rem; accent-color: var(--accent); }
+  .sec-foot .spacer { flex: 1; }
+  .nav-btn {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 8px; padding: .5rem .9rem; cursor: pointer; font-size: .9rem;
+    text-decoration: none; display: inline-flex; gap: .4rem; align-items: center;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .nav-btn.primary:hover { color: #fff; filter: brightness(1.05); }
+  .nav-btn[hidden] { display: none; }
+  .fine { font-size: .84rem; color: var(--ink-faint); }
+
+  @media print {
+    nav.side, header.top, .sec-foot, .prompt .copy { display: none !important; }
+    .app:not(.box) { display: block; }
+    section.sec { display: block !important; page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open sections" title="Sections">☰</button>
+    <div class="brand">
+      <span class="eyebrow">mini-agents · study guide</span>
+      <strong>How My work is built, and how to build it yourself</strong>
+    </div>
+    <div class="top-right">
+      <div class="progress" title="Sections marked done"><div class="bar" id="progressBar"></div></div>
+      <span class="progress-label" id="progressLabel">0 / 16 done</span>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle dark mode" title="Light / dark">◐</button>
+    </div>
+  </header>
+
+  <nav class="side" id="side" aria-label="Sections">
+    <ol class="toc" id="toc">
+      <li class="group">Start</li>
+      <li data-sec="start"><a href="#start"><span class="n">00</span>Start here: what you are going to build</a></li>
+      <li class="group">Foundations</li>
+      <li data-sec="picture"><a href="#picture"><span class="n">01</span>The big picture: one store, three doors</a></li>
+      <li data-sec="data"><a href="#data"><span class="n">02</span>The data model: one row per task</a></li>
+      <li data-sec="store"><a href="#store"><span class="n">03</span>The store: validation and a small state machine</a></li>
+      <li data-sec="time"><a href="#time"><span class="n">04</span>Time: dates, clocks and time zones</a></li>
+      <li data-sec="api"><a href="#api"><span class="n">05</span>The API: thin routes over the store</a></li>
+      <li class="group">Background work</li>
+      <li data-sec="runner"><a href="#runner"><span class="n">06</span>The runner: background jobs without a job queue</a></li>
+      <li data-sec="handover"><a href="#handover"><span class="n">07</span>Handing work to agents: as the person, in a chat</a></li>
+      <li class="group">Agents and features</li>
+      <li data-sec="tools"><a href="#tools"><span class="n">08</span>Agents using the calendar: the task tools</a></li>
+      <li data-sec="repeat"><a href="#repeat"><span class="n">09</span>Repeating tasks: one real row at a time</a></li>
+      <li class="group">Outside systems and reports</li>
+      <li data-sec="ports"><a href="#ports"><span class="n">10</span>Ports and adapters: Azure DevOps, meetings, Claude Code</a></li>
+      <li data-sec="standup"><a href="#standup"><span class="n">11</span>The standup: a report from many sources</a></li>
+      <li data-sec="hook"><a href="#hook"><span class="n">12</span>The Claude Code hook: your laptop reports in</a></li>
+      <li class="group">Front end</li>
+      <li data-sec="page"><a href="#page"><span class="n">13</span>The page: a calendar that feels instant</a></li>
+      <li class="group">Build it</li>
+      <li data-sec="build"><a href="#build"><span class="n">14</span>Build plan: a practice planner for Ciao Tutor</a></li>
+      <li class="group">Reference</li>
+      <li data-sec="reference"><a href="#reference"><span class="n">15</span>Reference: file map, glossary, what to learn next</a></li>
+    </ol>
+  </nav>
+
+  <main class="content" id="content">
+  <div class="inner">
+
+<!-- ===================================================== 00 START ===== -->
+<section class="sec" id="start" data-title="Start here">
+  <p class="eyebrow">Section 00</p>
+  <h1><span class="sec-num">/ 00</span>Start here: what you are going to build</h1>
+  <p class="lede"><strong>My work</strong> is the calendar page in agents_and_connectors. You can put your own to-dos on it, or hand a task to an agent, which the server then runs at the time you chose. Around the calendar sit your Azure DevOps tickets, your meetings, a standup summary and your Claude Code sessions. This guide teaches you how every part of it is built, so you could build it yourself.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>My work is <strong>one database table</strong> (<code class="inline">work_tasks</code>), <strong>one module that is allowed to change it</strong> (<code class="inline">src/work/store.py</code>), and <strong>three ways in</strong>: the web page, the agents' tools, and a background runner.</li>
+      <li>The hard parts are not the calendar drawing. They are <strong>state</strong> (who may set a task's status), <strong>time</strong> (dates, times and time zones), <strong>background work</strong> (running a task when nobody is watching) and <strong>outside systems</strong> (Azure DevOps, DevRev, Claude Code), each of which can fail.</li>
+      <li>Every section ends with an exercise that builds the same thing for <strong>Ciao Tutor</strong>, the example app of your main study guide: a <strong>practice planner</strong>. The learner plans study tasks, hands some to the tutor agent ("make my lesson at 08:00 every weekday"), and the server runs them. Section 14 is the full build plan (milestones P0 to P8). Your main <code class="inline">STUDY_GUIDE.html</code> has a short section that points here.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Which code this guide describes</span>
+    <p>My work is <strong>not on <code class="inline">dev</code> yet</strong>. It lives on the branch <code class="inline">feature/workflow-builder</code> (PR 974), which you have checked out in the worktree <code class="inline">Desktop/repos/aac-pr-974</code>. Every file path in this guide is relative to that worktree, verified at commit <code class="inline">8e008cc4</code> on 2026-10-13. If the branch changes before it merges, small details may differ; the design will not.</p>
+  </div>
+
+  <h2>What you see in the app, and where it lives</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>On the screen</th><th>What it really is</th><th>Main file(s)</th></tr></thead>
+    <tbody>
+      <tr><td class="k">The calendar (day, week, list, month)</td><td>A React component that draws rows from <code class="inline">GET /api/work/tasks</code></td><td><code class="inline">chatkit/app/src/work/Calendar.tsx</code></td></tr>
+      <tr><td class="k">A task's card</td><td>A form that sends <code class="inline">POST</code> or <code class="inline">PATCH</code> to the API</td><td><code class="inline">TaskEditor.tsx</code></td></tr>
+      <tr><td class="k">"Give it to an agent"</td><td>A row with <code class="inline">assignee = "monitor"</code> (or another slug) and status <code class="inline">scheduled</code></td><td><code class="inline">src/work/store.py</code></td></tr>
+      <tr><td class="k">The task runs at 09:00 by itself</td><td>A loop in the backend that wakes every 60 seconds</td><td><code class="inline">src/work/runner.py</code></td></tr>
+      <tr><td class="k">"Add a reminder for Thursday" in the chat</td><td>An agent calling the <code class="inline">add_task</code> tool</td><td><code class="inline">src/agent/tools_work.py</code></td></tr>
+      <tr><td class="k">Azure DevOps section</td><td>An adapter that queries Azure DevOps with WIQL</td><td><code class="inline">src/work/adapters/ado.py</code>, <code class="inline">AdoPanel.tsx</code></td></tr>
+      <tr><td class="k">Meetings (blue dots)</td><td>Your Outlook calendar, read through DevRev with your own token</td><td><code class="inline">src/work/adapters/devrev_meetings.py</code></td></tr>
+      <tr><td class="k">Standup panel</td><td>A report built from your tasks and your Azure DevOps items</td><td><code class="inline">src/work/standup.py</code>, <code class="inline">StandupPanel.tsx</code></td></tr>
+      <tr><td class="k">Claude Code sessions on the calendar</td><td>A Claude Code hook that reports each session to the API</td><td><code class="inline">scripts/work/claude_session_log.py</code></td></tr>
+      <tr><td class="k">The Routines tab</td><td>The former Workflows page; a routine is a multi-step workflow a task can run</td><td><code class="inline">src/workflows/</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>How to use this guide</h2>
+  <ul>
+    <li>Read in order the first time. Sections 01 to 05 are the foundation; everything later builds on them.</li>
+    <li>Every section has the same shape: <strong>TL;DR</strong> → the idea in plain words → <strong>In the real code</strong> (green box, with file names) → code excerpts copied from the branch → <strong>common mistakes</strong> (amber) → <strong>check yourself</strong> → <strong>exercise</strong> in mini-agents → an <strong>Ask Claude Code</strong> prompt.</li>
+    <li>The exercise prompts are written for the way you learn in mini-agents: <em>you</em> write the code, Claude Code explains and reviews. Change that if you want Claude to write it. The exercises assume Ciao Tutor has reached at least M2 (tutor chat with tools) and M3 (daily lesson flow) of the main guide.</li>
+    <li>Mark a section done at the bottom. Progress is kept in this browser. <kbd>←</kbd> <kbd>→</kbd> move between sections.</li>
+  </ul>
+
+  <h2>A study plan: 8 sessions</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Session</th><th>Read</th><th>Build in Ciao Tutor (section 14)</th></tr></thead>
+    <tbody>
+      <tr><td class="k">1</td><td>01 Big picture, 02 Data model</td><td>P0: the <code class="inline">study_tasks</code> table in SQLite</td></tr>
+      <tr><td class="k">2</td><td>03 The store, 04 Time</td><td>P1: <code class="inline">planner/store.py</code> with validation and a status rule, plus tests</td></tr>
+      <tr><td class="k">3</td><td>05 The API</td><td>P2: FastAPI routes for study tasks</td></tr>
+      <tr><td class="k">4</td><td>06 Runner, 07 Handing work to agents</td><td>P3: a background loop that gives due tasks to the tutor</td></tr>
+      <tr><td class="k">5</td><td>08 Agent tools</td><td>P4: <code class="inline">list_my_tasks</code> and <code class="inline">add_task</code> tools on the tutor</td></tr>
+      <tr><td class="k">6</td><td>09 Repeating, 11 Standup</td><td>P5: repeating tasks; P7: the study recap</td></tr>
+      <tr><td class="k">7</td><td>13 The page</td><td>P6: a plain-JS week view with optimistic updates</td></tr>
+      <tr><td class="k">8</td><td>10 Ports, 12 Claude Code hook, 15 Reference</td><td>Optional P8: one outside "source" behind a port</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="box idea">
+    <span class="label">The one idea</span>
+    <p>A feature like this is a small <strong>state machine with a calendar drawn on top</strong>. If the rules about state live in exactly one place and every way in goes through that place, the page, the agents and the background runner can never disagree.</p>
+  </div>
+</section>
+
+<!-- ===================================================== 01 BIG PICTURE ===== -->
+<section class="sec" id="picture" data-title="The big picture">
+  <p class="eyebrow">Section 01 · Foundations</p>
+  <h1><span class="sec-num">/ 01</span>The big picture: one store, three doors</h1>
+  <p class="lede">Before any code, get the shape of the system in your head. Everything else in this guide hangs off this one diagram.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>There are <strong>three callers</strong>: the <strong>page</strong> (through HTTP routes), the <strong>agents</strong> (through tools) and the <strong>runner</strong> (a background loop). All three call the same functions in <code class="inline">store.py</code>.</li>
+      <li>The store <strong>checks every input</strong> and <strong>derives every status</strong>. No caller is trusted to set a status itself.</li>
+      <li>Outside systems (Azure DevOps, meetings, Claude Code) sit behind <strong>ports</strong>: small interfaces, so the calendar does not care which system is behind them.</li>
+    </ul>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 780 360" role="img" aria-label="Architecture: the browser page, the agents in a chat, and the runner loop all call store.py, which reads and writes the work_tasks table in Postgres. Store.py is also called by the standup. Outside systems Azure DevOps, DevRev meetings and Claude Code sit behind ports.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow"/></marker>
+        <marker id="a1h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow hi"/></marker>
+        <marker id="a1w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow warm"/></marker>
+      </defs>
+      <!-- callers -->
+      <rect x="20" y="20" width="200" height="62" rx="10" class="d-box"/>
+      <text x="120" y="45" text-anchor="middle" class="d-text" font-weight="600">The page (React)</text>
+      <text x="120" y="64" text-anchor="middle" class="d-text sm">fetch → /api/work/* routes</text>
+      <rect x="290" y="20" width="200" height="62" rx="10" class="d-box"/>
+      <text x="390" y="45" text-anchor="middle" class="d-text" font-weight="600">An agent in a chat</text>
+      <text x="390" y="64" text-anchor="middle" class="d-text sm">tools: add_task, list_my_tasks…</text>
+      <rect x="560" y="20" width="200" height="62" rx="10" class="d-box warm"/>
+      <text x="660" y="45" text-anchor="middle" class="d-text" font-weight="600">The runner</text>
+      <text x="660" y="64" text-anchor="middle" class="d-text sm">every 60 s: claim and run</text>
+      <!-- store -->
+      <rect x="230" y="140" width="320" height="70" rx="10" class="d-box hi"/>
+      <text x="390" y="168" text-anchor="middle" class="d-text" font-weight="600">src/work/store.py</text>
+      <text x="390" y="188" text-anchor="middle" class="d-text sm">checks input · derives status · one person's rows only</text>
+      <path d="M120 82 L300 138" class="d-line hi" marker-end="url(#a1h)"/>
+      <path d="M390 82 L390 138" class="d-line hi" marker-end="url(#a1h)"/>
+      <path d="M660 82 L480 138" class="d-line hi" marker-end="url(#a1h)"/>
+      <!-- db -->
+      <rect x="290" y="270" width="200" height="62" rx="10" class="d-box"/>
+      <text x="390" y="296" text-anchor="middle" class="d-text" font-weight="600">Postgres</text>
+      <text x="390" y="315" text-anchor="middle" class="d-text mono">work_tasks · work_settings</text>
+      <path d="M390 210 L390 268" class="d-line" marker-end="url(#a1)"/>
+      <!-- runner runs agents -->
+      <path d="M700 82 C 760 180, 700 230, 620 240" class="d-line warm" marker-end="url(#a1w)"/>
+      <text x="640" y="150" text-anchor="end" class="d-text sm">runs a turn</text>
+      <text x="640" y="165" text-anchor="end" class="d-text sm">as the person</text>
+      <rect x="560" y="240" width="200" height="50" rx="10" class="d-box warm"/>
+      <text x="660" y="270" text-anchor="middle" class="d-text">agent turn → a new chat</text>
+      <!-- ports -->
+      <rect x="20" y="240" width="200" height="100" rx="10" class="d-box"/>
+      <text x="120" y="262" text-anchor="middle" class="d-text" font-weight="600">Ports → adapters</text>
+      <text x="120" y="282" text-anchor="middle" class="d-text sm">Azure DevOps items</text>
+      <text x="120" y="299" text-anchor="middle" class="d-text sm">DevRev meetings</text>
+      <text x="120" y="316" text-anchor="middle" class="d-text sm">Claude Code sessions</text>
+      <path d="M120 82 L120 238" class="d-line" marker-end="url(#a1)"/>
+    </svg>
+    <p class="cap">Three callers, one store. The runner is the only one that runs anything; the store is the only one that decides status.</p>
+  </div>
+
+  <h2>Why "one store, three doors" matters</h2>
+  <p>Imagine the opposite. The page's route checks that a title is not empty, the agent's tool checks it too but in a slightly different way, and the runner never checks. Six months later, someone changes the rule in one place. Now an agent can create a task the page cannot display. These bugs are slow to find because each piece looks correct on its own.</p>
+  <p>As a data scientist you already know this problem in another form: <strong>training-serving skew</strong>. If feature engineering is written twice (once in the training notebook, once in the serving code), the two drift apart. The cure is the same: write the logic once and make every path call it.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li><code class="inline">src/work/store.py</code> is sync SQLAlchemy. The routes in <code class="inline">src/api/work.py</code> call it, the tools in <code class="inline">src/agent/tools_work.py</code> call it, and <code class="inline">src/work/runner.py</code> calls it. Read the docstring at the top of <code class="inline">store.py</code>: "A task's status is derived here, never set by a caller."</li>
+      <li>Each store function takes <code class="inline">user_id</code> and every query filters on it. "Another person's task is never found" is enforced in the SQL itself, not by a check that someone could forget.</li>
+      <li><code class="inline">src/work/__init__.py</code> has the package overview in 10 lines. Read it first when you open the code.</li>
+    </ul>
+  </div>
+
+  <h2>The five kinds of task</h2>
+  <p>A task's <code class="inline">assignee</code> says who does it. The <code class="inline">kind</code> is derived from it, and the kind decides what the server does at the task's time.</p>
+  <div class="tw"><table class="t">
+    <thead><tr><th>assignee</th><th>kind</th><th>At its time the server…</th><th>Statuses</th></tr></thead>
+    <tbody>
+      <tr><td class="k">me</td><td>me</td><td>does nothing: it is your reminder or to-do</td><td>open → done</td></tr>
+      <tr><td class="k">claude</td><td>claude</td><td>does nothing: you start it in Claude Code on your laptop</td><td>open → done</td></tr>
+      <tr><td class="k">an agent slug, e.g. <code class="inline">monitor</code></td><td>agent</td><td>runs one turn of that agent as you, in a new chat</td><td>scheduled → running → done | failed</td></tr>
+      <tr><td class="k">routine</td><td>routine</td><td>runs each step of a workflow in order, in one chat</td><td>scheduled → running → done | failed</td></tr>
+      <tr><td class="k">computer</td><td>computer</td><td>asks DevRev's agent with your own DevRev token</td><td>scheduled → running → done | failed</td></tr>
+    </tbody>
+  </table></div>
+  <pre class="code"><span class="c"># src/work/store.py</span>
+<span class="k">def</span> kind_of(assignee: str) -> str:
+    <span class="s">"""What a task is by who has it: ``me``, ``agent``, ``routine``,
+    ``computer`` or ``claude``."""</span>
+    <span class="k">return</span> assignee <span class="k">if</span> assignee <span class="k">in</span> (ME, ROUTINE, COMPUTER, CLAUDE) <span class="k">else</span> <span class="s">"agent"</span></pre>
+  <p>Notice what is <em>not</em> stored: <code class="inline">kind</code>. It is computed every time a task is turned into JSON. If you stored it, you would have two columns that must agree, and one day they would not.</p>
+
+  <div class="box warn">
+    <span class="label">Common misconceptions</span>
+    <ul>
+      <li><strong>"The agent runs the task in my browser."</strong> No. The browser only saves the task. The backend server runs it, even if your laptop is closed.</li>
+      <li><strong>"A Claude Code task runs on the server."</strong> No. The server never runs it. It is a reminder with a copyable command. (This is what confused you on the Azure DevOps ticket earlier.)</li>
+      <li><strong>"The calendar is the feature."</strong> The calendar is the easy part. The value is in the rules: who runs what, as whom, when, and what happens if it fails.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why does the store, not the page, decide a task's status?</summary><p>Because three callers change tasks. If each one decided status, they would eventually disagree. Putting the rule in the one module everyone must call keeps a single source of truth, the same reason you compute features in one shared function rather than twice.</p></details>
+  <details class="qa"><summary>You give a task to the Monitor agent for tomorrow 09:00 and close your laptop. What happens at 09:00?</summary><p>The runner loop in the backend (not your browser) finds the task is due, marks it running, runs one Monitor turn as you, writes the answer into a new chat that shows as unread, and marks the task done or failed.</p></details>
+  <details class="qa"><summary>Name the three doors into the store.</summary><p>The HTTP routes used by the page (<code class="inline">src/api/work.py</code>), the agents' tools (<code class="inline">src/agent/tools_work.py</code>) and the runner (<code class="inline">src/work/runner.py</code>).</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise</span>
+    <p>Draw this diagram from memory on paper. Then open <code class="inline">aac-pr-974/src/work/</code> and, for each file, write one sentence saying which box of the diagram it belongs to. Success: every file in <code class="inline">src/work/</code> and <code class="inline">src/work/adapters/</code> has a box.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>I'm studying the My work feature in ../aac-pr-974 (branch feature/workflow-builder).
+Read src/work/__init__.py, src/work/store.py (just the docstrings and function
+names), src/api/work.py and src/agent/tools_work.py.
+Draw an ASCII diagram of who calls which store function. Then list every
+store function that changes data and which of the three callers uses it.
+Don't change any code.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 02 DATA MODEL ===== -->
+<section class="sec" id="data" data-title="The data model">
+  <p class="eyebrow">Section 02 · Foundations</p>
+  <h1><span class="sec-num">/ 02</span>The data model: one row per task</h1>
+  <p class="lede">Good features start with a good table. Learn to read each column as a decision: what it means when it is empty, who sets it, and why it exists.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>One table, <code class="inline">work_tasks</code>. Plus <code class="inline">work_settings</code>: one JSON blob of settings per person.</li>
+      <li><strong>Empty means something.</strong> No <code class="inline">date</code> = "no date yet" (the side list). No <code class="inline">time</code> = "all day". No <code class="inline">run_at</code> = "the server never starts this".</li>
+      <li>Two kinds of column: <strong>what the person said</strong> (title, date, time, assignee…) and <strong>what the system derived or recorded</strong> (status, run_at, result, thread_id, done_at…). Callers only send the first kind.</li>
+    </ul>
+  </div>
+
+  <h2>The columns, grouped by purpose</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Group</th><th>Columns</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Identity</td><td><code class="inline">id</code>, <code class="inline">user_id</code></td><td><code class="inline">wt_</code> + 12 hex characters. <code class="inline">user_id</code> is the person's email; every query filters on it</td></tr>
+      <tr><td class="k">What</td><td><code class="inline">title</code>, <code class="inline">notes</code></td><td>Title ≤ 300 characters, one line. Notes ≤ 4,000: a note for you, or the <em>instruction</em> for an agent</td></tr>
+      <tr><td class="k">When</td><td><code class="inline">date</code>, <code class="inline">time</code>, <code class="inline">duration</code>, <code class="inline">tz</code></td><td>Your local day, <code class="inline">HH:MM</code> (empty = all day), minutes (5–1,440), an IANA zone like <code class="inline">Europe/Amsterdam</code></td></tr>
+      <tr><td class="k">Who</td><td><code class="inline">assignee</code>, <code class="inline">workflow_id</code>, <code class="inline">inputs_json</code></td><td>Routine tasks also store which workflow and the values for its placeholders</td></tr>
+      <tr><td class="k">Repeat</td><td><code class="inline">repeat</code>, <code class="inline">series_id</code></td><td>daily, weekdays, weekly, biweekly, monthly. <code class="inline">series_id</code> = id of the first task of the series</td></tr>
+      <tr><td class="k">Order</td><td><code class="inline">position</code></td><td>A float: your own order within a day (section 13 explains why a float)</td></tr>
+      <tr><td class="k">Links</td><td><code class="inline">campaign_id</code>, <code class="inline">campaign_label</code>, <code class="inline">ado_id</code>, <code class="inline">external_id</code></td><td><code class="inline">external_id</code> is <code class="inline">claude:&lt;session id&gt;</code> for a Claude Code session</td></tr>
+      <tr><td class="k">Derived / recorded</td><td><code class="inline">status</code>, <code class="inline">run_at</code>, <code class="inline">thread_id</code>, <code class="inline">result</code>, <code class="inline">done_at</code>, <code class="inline">archived_at</code></td><td>Set by the store and the runner only</td></tr>
+      <tr><td class="k">Audit</td><td><code class="inline">created_by</code>, <code class="inline">created_via</code>, <code class="inline">created_at</code>, <code class="inline">updated_at</code></td><td>"you"/app, an agent's slug/chat, mcp/mcp, claude/claude</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Indexes: designed from the queries</h2>
+  <p>An index is chosen by asking "which queries run often, and what do they filter on?" There are three, one per hot query:</p>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Index</th><th>The query it serves</th></tr></thead>
+    <tbody>
+      <tr><td class="k"><code class="inline">(user_id, date)</code></td><td>The page: "this person's tasks between Monday and Sunday"</td></tr>
+      <tr><td class="k"><code class="inline">(status, run_at)</code></td><td>The runner, every minute: "scheduled tasks whose <code class="inline">run_at</code> has passed", for <em>all</em> people</td></tr>
+      <tr><td class="k">unique <code class="inline">(user_id, external_id)</code></td><td>The Claude Code hook: "find the task of this session". Unique, so a session can never be filed twice</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li>The table is <code class="inline">WorkTaskModel</code> in <code class="inline">src/api/postgres_store.py</code> (SQLAlchemy declarative). Its docstring is a compact summary of the whole feature.</li>
+      <li><strong>Schema changes only add.</strong> Columns added after the first release are created on startup with <code class="inline">ALTER TABLE work_tasks ADD COLUMN IF NOT EXISTS …</code>. There is no Alembic migration tool. This works because the rule is "never rename or drop a column in place", which also makes zero-downtime deploys safe: old and new code can both run against the same table.</li>
+      <li>Times are stored as <strong>naive UTC</strong> (<code class="inline">datetime</code> without a zone, but always meaning UTC), like the other tables in the app.</li>
+    </ul>
+  </div>
+
+  <pre class="code"><span class="c"># src/api/postgres_store.py (trimmed)</span>
+<span class="k">class</span> WorkTaskModel(Base):
+    __tablename__ = <span class="s">"work_tasks"</span>
+
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(128), nullable=False, index=True)
+    title = Column(String(300), nullable=False)
+    notes = Column(Text, nullable=True)  <span class="c"># an agent's instructions, or a note</span>
+    date = Column(Date, nullable=True)  <span class="c"># None: no date yet</span>
+    time = Column(String(5), nullable=True)  <span class="c"># "HH:MM"; None: all day</span>
+    duration = Column(Integer, nullable=False, default=30)  <span class="c"># minutes</span>
+    tz = Column(String(64), nullable=False)
+    assignee = Column(String(32), nullable=False, default=<span class="s">"me"</span>)
+    status = Column(String(16), nullable=False)
+    run_at = Column(DateTime, nullable=True)
+    thread_id = Column(String(64), nullable=True)
+    result = Column(Text, nullable=True)
+    <span class="c"># … created_by, created_via, timestamps, workflow_id, inputs_json,
+    # repeat, series_id, position, archived_at, ado_id, external_id</span></pre>
+
+  <h2>Why <code class="inline">time</code> is a string and not a SQL TIME</h2>
+  <p><code class="inline">"09:30"</code> is how the page shows it, how the model writes it, and how a person types it. Storing it as text in one fixed format (<code class="inline">HH:MM</code>, always two digits) means it sorts correctly as text and never surprises anyone with seconds or time-zone conversions. The store normalises <code class="inline">9:30</code> to <code class="inline">09:30</code> on the way in, so the format is guaranteed.</p>
+
+  <h2>Archive instead of delete</h2>
+  <p>A done task stays on the calendar (struck through) until you archive it. Archiving sets <code class="inline">archived_at</code>; nothing is deleted. Why? The standup reads done tasks to tell you what you did since yesterday. If "clean up my list" deleted rows, the standup would lose history. This is called a <strong>soft delete</strong>: hide the row, keep the fact.</p>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Using one "magic" value for two meanings.</strong> If "no time" were stored as <code class="inline">00:00</code>, you could no longer tell "all day" from "midnight". Use <code class="inline">NULL</code> and give it one documented meaning.</li>
+      <li><strong>Storing what you can compute.</strong> <code class="inline">kind</code> is derived from <code class="inline">assignee</code>, so it is not a column. <code class="inline">status</code> <em>is</em> stored because computing it would need the run history, but only the store may write it.</li>
+      <li><strong>Forgetting the per-user filter.</strong> In a multi-user app, every query that reads tasks must say <code class="inline">WHERE user_id = ?</code>. One missing filter is a data leak.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>A row has <code class="inline">date = NULL</code> and <code class="inline">time = "10:00"</code>. Is that valid?</summary><p>No. A time needs a date. The store refuses it on create ("A time needs a date.") and on update clears the time when the date is cleared.</p></details>
+  <details class="qa"><summary>Why is there an index on <code class="inline">(status, run_at)</code> but no <code class="inline">user_id</code> in it?</summary><p>The runner's query is not per person: it looks for every scheduled task that is due, across all users. So it filters on status and run_at only.</p></details>
+  <details class="qa"><summary>Why does <code class="inline">external_id</code> have a <em>unique</em> index?</summary><p>The hook reports the same Claude Code session many times (after every answer). Unique <code class="inline">(user_id, external_id)</code> guarantees one task per session even if two reports race. The code finds the row by it and updates instead of inserting.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P0)</span>
+    <p>In Ciao Tutor, create <code class="inline">planner/db.py</code> with a function <code class="inline">init_db(path)</code> that creates a SQLite table <code class="inline">study_tasks</code> in the same database as the vocab, with: <code class="inline">id, user_id, title, notes, date, time, duration, tz, assignee, status, run_at, result, created_at, updated_at, done_at</code>, and the two indexes <code class="inline">(user_id, date)</code> and <code class="inline">(status, run_at)</code>. Use the standard library <code class="inline">sqlite3</code>; no new dependency. Success: running it twice does not fail (<code class="inline">CREATE TABLE IF NOT EXISTS</code>) and <code class="inline">.schema study_tasks</code> in the sqlite3 shell shows the table and indexes.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>I'm adding a practice planner to Ciao Tutor, modelled on the My work feature,
+using stdlib sqlite3. I wrote planner/db.py with a study_tasks table.
+Compare my schema with WorkTaskModel in
+../aac-pr-974/src/api/postgres_store.py. For each column I left out, tell me
+whether my mini version needs it and why. Review my types and NULL choices.
+Don't write the code for me; point at the lines to change.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 03 STORE ===== -->
+<section class="sec" id="store" data-title="The store">
+  <p class="eyebrow">Section 03 · Foundations</p>
+  <h1><span class="sec-num">/ 03</span>The store: validation and a small state machine</h1>
+  <p class="lede"><code class="inline">store.py</code> is the heart of My work. It is about 1,000 lines, but it does three simple things: it checks input, it derives status, and it only ever touches one person's rows.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>Every field has a small <strong>validator function</strong> that either returns a clean value or raises <code class="inline">WorkError("why")</code>. A dict maps field name → validator.</li>
+      <li><code class="inline">WorkError</code> becomes <strong>HTTP 400</strong> in the routes and <strong>"Not added: why"</strong> text in the tools. The same message reaches a person and a model.</li>
+      <li>Status follows a <strong>state machine</strong>. Callers send intentions (<code class="inline">done=True</code>, a new date, a new assignee); the store works out the new status.</li>
+    </ul>
+  </div>
+
+  <h2>Validators: one small function per field</h2>
+  <pre class="code"><span class="c"># src/work/store.py</span>
+<span class="k">class</span> WorkError(ValueError):
+    <span class="s">"""Input a task does not accept; the message says why."""</span>
+
+<span class="k">def</span> _title(value) -> str:
+    title = <span class="s">" "</span>.join(str(value <span class="k">or</span> <span class="s">""</span>).split())
+    <span class="k">if not</span> title:
+        <span class="k">raise</span> WorkError(<span class="s">"A title is required."</span>)
+    <span class="k">if</span> len(title) > MAX_TITLE:
+        <span class="k">raise</span> WorkError(f<span class="s">"A title is at most {MAX_TITLE} characters."</span>)
+    <span class="k">return</span> title
+
+<span class="k">def</span> _time(value) -> str | None:
+    <span class="s">"""``HH:MM`` from ``H:MM`` or ``HH:MM``; None for all day."""</span>
+    text = str(value <span class="k">if</span> value <span class="k">is not</span> None <span class="k">else</span> <span class="s">""</span>).strip()
+    <span class="k">if not</span> text:
+        <span class="k">return</span> None
+    m = _TIME.fullmatch(text)
+    <span class="k">if not</span> m <span class="k">or</span> int(m[1]) > 23 <span class="k">or</span> int(m[2]) > 59:
+        <span class="k">raise</span> WorkError(f<span class="s">"“{text}” is not a time; use HH:MM, 00:00 to 23:59."</span>)
+    <span class="k">return</span> f<span class="s">"{int(m[1]):02d}:{m[2]}"</span>
+
+<span class="c"># What a task's fields are checked with</span>
+_FIELDS = {
+    <span class="s">"title"</span>: _title, <span class="s">"notes"</span>: _notes, <span class="s">"date"</span>: parse_date, <span class="s">"time"</span>: _time,
+    <span class="s">"duration"</span>: _duration, <span class="s">"tz"</span>: _tz, <span class="s">"campaign_id"</span>: _campaign_id,
+    <span class="s">"campaign_label"</span>: _campaign_label, <span class="s">"repeat"</span>: _repeat,
+    <span class="s">"position"</span>: _position, <span class="s">"ado_id"</span>: _ado_id,
+}</pre>
+  <p>Then <code class="inline">create_task</code> runs them all in one line: <code class="inline">task = {key: _FIELDS[key](value) for key, value in fields.items()}</code>. After that, it checks the rules that need more than one field ("a time needs a date", "a repeat needs a date").</p>
+  <p>Notice the error messages. They say what was wrong <em>and</em> what to do: "use HH:MM, 00:00 to 23:59". This matters twice over here, because a <strong>model</strong> reads these messages too (through the tools). A model that gets "invalid input" is stuck; a model that gets "use YYYY-MM-DD" fixes its call and tries again.</p>
+
+  <h2>Who may be an assignee</h2>
+  <p><code class="inline">_assignee</code> is the most interesting validator, because whether a value is allowed depends on <em>who is asking</em>:</p>
+  <ul>
+    <li><code class="inline">me</code> and <code class="inline">routine</code>: always allowed (a routine is checked further by <code class="inline">_routine_fields</code>).</li>
+    <li><code class="inline">claude</code>: only if config allows Claude Code for this person (<code class="inline">integrations.allowed("claude", user_id)</code>).</li>
+    <li><code class="inline">computer</code>: only if the person connected DevRev with a pasted token.</li>
+    <li>An agent slug: it must be an enabled agent <em>and</em> one this person may use (<code class="inline">allowed_agents(user_id)</code>).</li>
+  </ul>
+  <p>This is <strong>authorisation inside validation</strong>. The page also hides buttons you cannot use, but the server never trusts that. Hiding a button is a convenience; refusing on the server is the security.</p>
+
+  <h2>The state machine</h2>
+  <div class="diagram">
+    <svg viewBox="0 0 780 250" role="img" aria-label="Two state machines. Your own task or a Claude Code task: open to done, and done back to open. A handed-over task: scheduled to running by the runner claim, running to done or failed, done or failed back to scheduled when moved or reopened.">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow"/></marker>
+        <marker id="a3h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow hi"/></marker>
+      </defs>
+      <text x="20" y="28" class="d-text" font-weight="600">me, claude</text>
+      <rect x="20" y="45" width="110" height="44" rx="10" class="d-box"/>
+      <text x="75" y="72" text-anchor="middle" class="d-text">open</text>
+      <rect x="230" y="45" width="110" height="44" rx="10" class="d-box"/>
+      <text x="285" y="72" text-anchor="middle" class="d-text">done</text>
+      <path d="M130 58 L228 58" class="d-line" marker-end="url(#a3)"/>
+      <text x="180" y="50" text-anchor="middle" class="d-text mono">done=true</text>
+      <path d="M228 78 L132 78" class="d-line" marker-end="url(#a3)"/>
+      <text x="180" y="100" text-anchor="middle" class="d-text mono">done=false</text>
+
+      <text x="20" y="150" class="d-text" font-weight="600">agent, routine, computer</text>
+      <rect x="20" y="170" width="120" height="44" rx="10" class="d-box"/>
+      <text x="80" y="197" text-anchor="middle" class="d-text">scheduled</text>
+      <rect x="260" y="170" width="120" height="44" rx="10" class="d-box hi"/>
+      <text x="320" y="197" text-anchor="middle" class="d-text">running</text>
+      <rect x="520" y="135" width="110" height="40" rx="10" class="d-box"/>
+      <text x="575" y="160" text-anchor="middle" class="d-text">done</text>
+      <rect x="520" y="205" width="110" height="40" rx="10" class="d-box"/>
+      <text x="575" y="230" text-anchor="middle" class="d-text">failed</text>
+      <path d="M140 192 L258 192" class="d-line hi" marker-end="url(#a3h)"/>
+      <text x="199" y="184" text-anchor="middle" class="d-text mono">claim (runner)</text>
+      <path d="M380 185 L518 157" class="d-line hi" marker-end="url(#a3h)"/>
+      <path d="M380 200 L518 223" class="d-line hi" marker-end="url(#a3h)"/>
+      <text x="450" y="148" text-anchor="middle" class="d-text mono">finish(ok)</text>
+      <path d="M640 160 C 720 120, 720 60, 420 60 C 200 60, 90 110, 80 168" class="d-line" marker-end="url(#a3)"/>
+      <text x="560" y="52" text-anchor="middle" class="d-text sm">moved, reassigned or done=false → scheduled again</text>
+    </svg>
+    <p class="cap">The caller never writes a status. It sends an intention; the store computes the next state.</p>
+  </div>
+
+  <p>Here is the part of <code class="inline">update_task</code> that computes the new status. Read it slowly: it is the whole state machine in eight lines.</p>
+  <pre class="code"><span class="c"># src/work/store.py, inside update_task</span>
+agent = row.assignee <span class="k">not in</span> LOCAL          <span class="c"># LOCAL = ("me", "claude")</span>
+status = row.status
+<span class="k">if</span> done <span class="k">is not</span> None:
+    status = <span class="s">"done"</span> <span class="k">if</span> done <span class="k">else</span> (<span class="s">"scheduled"</span> <span class="k">if</span> agent <span class="k">else</span> <span class="s">"open"</span>)
+<span class="k">elif</span> row.assignee != assignee:             <span class="c"># handed to someone else</span>
+    status = <span class="s">"scheduled"</span> <span class="k">if</span> agent <span class="k">else</span> <span class="s">"open"</span>
+<span class="k">elif</span> agent <span class="k">and</span> moved <span class="k">and</span> status <span class="k">in</span> (<span class="s">"done"</span>, <span class="s">"failed"</span>):
+    status = <span class="s">"scheduled"</span>                    <span class="c"># moved: it should run again</span>
+finished = status == <span class="s">"done"</span> <span class="k">and</span> row.status != <span class="s">"done"</span>
+<span class="k">if</span> status != row.status:
+    row.status = status
+    row.done_at = now <span class="k">if</span> status == <span class="s">"done"</span> <span class="k">else</span> None
+row.run_at = _run_at(row.date, row.time, row.tz) <span class="k">if</span> agent <span class="k">else</span> None</pre>
+  <p>And one guard just before it, which prevents a real race:</p>
+  <pre class="code"><span class="k">if</span> row.status == <span class="s">"running"</span> <span class="k">and</span> (moved <span class="k">or</span> done <span class="k">is not</span> None):
+    <span class="k">raise</span> WorkError(
+        <span class="s">"This task is running now; change when it is or whether it is "</span>
+        <span class="s">"done after it has finished."</span>
+    )</pre>
+  <p>Why? If you could move a running task to next week, the runner would finish and write "done", and your move would be overwritten by an outcome for a run you no longer wanted. Refusing the change while it runs is simpler than merging two writers.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li><code class="inline">_mine(session, user_id, task_id)</code> is the only way update and delete find a row: <code class="inline">WHERE id = ? AND user_id = ?</code>. Someone else's task id gives <code class="inline">None</code>, which the route turns into 404. The route does not reveal that the task exists.</li>
+      <li><code class="inline">update_task</code> refuses unknown field names: <code class="inline">"Cannot change: …"</code>. That catches typos from both the page and the model.</li>
+      <li>Every function opens its own <code class="inline">Session(db)</code> and commits once. One function = one transaction.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Letting the client send <code class="inline">status</code>.</strong> Notice that the API's <code class="inline">TaskPatch</code> has no <code class="inline">status</code> field at all. The page sends <code class="inline">done: true</code>.</li>
+      <li><strong>Validating only in the UI.</strong> The model, an MCP client or a curl command bypass the UI. Validate on the server, always.</li>
+      <li><strong>Vague errors.</strong> "Bad request" helps no one. Each <code class="inline">WorkError</code> says what was wrong and the accepted form.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>A Monitor task ran and failed. You drag it to tomorrow. What is its status after the drag, and why?</summary><p><code class="inline">scheduled</code>. It is an agent task (<code class="inline">agent</code> is true), its date changed (<code class="inline">moved</code>) and its status was <code class="inline">failed</code>, so the third branch sets it back to scheduled, and <code class="inline">run_at</code> is recomputed for tomorrow.</p></details>
+  <details class="qa"><summary>You tick your own task done. What else can happen in the same transaction?</summary><p>If it repeats, <code class="inline">finished</code> is true, so <code class="inline">_add_next</code> adds the next occurrence before the commit (section 09).</p></details>
+  <details class="qa"><summary>Why does the store compute <code class="inline">run_at</code> on every update, not just when the date changes?</summary><p>Because several things change it: date, time, time zone, and the assignee (a task handed from an agent back to "me" must lose its <code class="inline">run_at</code>, or the runner would still start it). Recomputing it every time from the current fields is simpler and cannot get out of sync.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P1)</span>
+    <p>Write <code class="inline">planner/store.py</code> in Ciao Tutor with <code class="inline">WorkError</code>, validators for title, date, time and duration, a <code class="inline">_FIELDS</code> dict, and <code class="inline">create_task</code>, <code class="inline">update_task</code>, <code class="inline">list_tasks</code>, <code class="inline">delete_task</code>. Assignees: <code class="inline">"me"</code> (the learner does it), <code class="inline">"tutor"</code> (the tutor chat agent does it, like an agent slug) or <code class="inline">"lesson"</code> (the daily-lesson flow runs, like a routine). Status rule as above. Write pytest tests for: empty title refused, <code class="inline">9:5</code> refused, <code class="inline">9:05</code> becomes <code class="inline">09:05</code>, time without date refused, another user's task not found, a failed agent task moved → scheduled. Success: all tests pass.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>I wrote planner/store.py in Ciao Tutor, modelled on ../aac-pr-974/src/work/store.py.
+Review only the status logic in my update_task: walk me through what my code
+does for these cases, then tell me which ones differ from the real store:
+(1) my own task, done=True; (2) agent task, failed, date moved;
+(3) agent task, done, reassigned to "me"; (4) agent task running, date moved.
+Ask me to predict each answer before you tell me.</pre>
+  </div>
+</section>
+<!-- ===================================================== 04 TIME ===== -->
+<section class="sec" id="time" data-title="Time and time zones">
+  <p class="eyebrow">Section 04 · Foundations</p>
+  <h1><span class="sec-num">/ 04</span>Time: dates, clocks and time zones</h1>
+  <p class="lede">Every calendar bug you will ever meet is a time bug. My work avoids most of them with one decision: store what the person said (a local day and a local clock time) and compute the exact instant only when the server needs it.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>A task stores <strong>local</strong> <code class="inline">date</code> + <code class="inline">time</code> + the zone <code class="inline">tz</code>. The calendar draws exactly those values.</li>
+      <li>For tasks the server runs, the store computes <code class="inline">run_at</code>: that local moment converted to <strong>UTC</strong>. The runner compares <code class="inline">run_at</code> with "now in UTC". All day = 09:00.</li>
+      <li>On the page, dates are plain <code class="inline">"YYYY-MM-DD"</code> strings, never JavaScript <code class="inline">Date</code> objects passed around, so a day can never shift by a time zone.</li>
+    </ul>
+  </div>
+
+  <h2>Two kinds of time</h2>
+  <p>There are two different questions, and mixing them up is the root of most time bugs:</p>
+  <div class="cards">
+    <div class="card"><span class="tag">Wall-clock time</span><h3>"Thursday at 09:00"</h3><p>What a person means. It depends on where they are. If daylight saving starts, "09:00" is still 09:00 on their wall clock. Store this for anything a human plans.</p></div>
+    <div class="card"><span class="tag">An instant</span><h3>"2026-10-15 07:00:00 UTC"</h3><p>One exact point on the world's timeline. Store this for anything a machine must compare: "is it due yet?", "when did it finish?".</p></div>
+  </div>
+  <p>My work stores both, each for its own job. <code class="inline">date</code>, <code class="inline">time</code> and <code class="inline">tz</code> are the wall-clock plan. <code class="inline">run_at</code>, <code class="inline">created_at</code>, <code class="inline">done_at</code> are instants, in UTC.</p>
+
+  <pre class="code"><span class="c"># src/work/store.py</span>
+DEFAULT_RUN_TIME = <span class="s">"09:00"</span>  <span class="c"># when an agent task with a date and no time starts</span>
+
+<span class="k">def</span> _run_at(day: dt.date | None, time: str | None, tz: str) -> datetime | None:
+    <span class="s">"""When an agent task starts: its local date and time as naive UTC."""</span>
+    <span class="k">if</span> day <span class="k">is</span> None:
+        <span class="k">return</span> None
+    hour, minute = (int(p) <span class="k">for</span> p <span class="k">in</span> (time <span class="k">or</span> DEFAULT_RUN_TIME).split(<span class="s">":"</span>))
+    local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=ZoneInfo(tz))
+    <span class="k">return</span> local.astimezone(UTC).replace(tzinfo=None)</pre>
+  <p><code class="inline">ZoneInfo("Europe/Amsterdam")</code> knows the daylight-saving rules for every date, so 09:00 in July becomes 07:00 UTC and 09:00 in December becomes 08:00 UTC. You never write those offsets yourself.</p>
+
+  <h2>Where does the zone come from?</h2>
+  <ul>
+    <li><strong>From the page:</strong> the browser's own zone (<code class="inline">Intl.DateTimeFormat().resolvedOptions().timeZone</code>) is sent with every new task, and with an update <em>only</em> when the date or time changes.</li>
+    <li><strong>From an agent's tool call:</strong> the zone of the person's most recently changed task; if they have none, <code class="inline">work.default_timezone</code> in <code class="inline">config.yaml</code> (<code class="inline">Europe/Amsterdam</code>).</li>
+  </ul>
+  <pre class="code"><span class="c">// chatkit/app/src/work/api.ts</span>
+<span class="k">export async function</span> updateTask(id: string, patch: TaskInput): Promise&lt;Task&gt; {
+  <span class="c">// The zone goes with a new day or time only: on its own it would move the</span>
+  <span class="c">// task (and start a finished agent task again).</span>
+  <span class="k">const</span> moved = <span class="s">'date'</span> <span class="k">in</span> patch || <span class="s">'time'</span> <span class="k">in</span> patch;
+  <span class="k">return</span> json(<span class="k">await</span> apiFetch(<span class="s">`/api/work/tasks/${encodeURIComponent(id)}`</span>, {
+    method: <span class="s">'PATCH'</span>, body: JSON.stringify(moved ? { tz: browserTz(), ...patch } : patch),
+  }), <span class="s">'Saving the task'</span>);
+}</pre>
+  <p>Read that comment twice. Changing <code class="inline">tz</code> counts as "moved" in the store (section 03), and moving a done agent task sets it back to <code class="inline">scheduled</code>. So if the page sent the zone with <em>every</em> edit, fixing a typo in a finished task's notes from a laptop in another zone would run the task again. A small detail in the client protects a rule on the server.</p>
+
+  <h2>Dates on the page: strings, not Date objects</h2>
+  <pre class="code"><span class="c">// chatkit/app/src/work/dates.ts</span>
+<span class="c">/** Local midnight of a YYYY-MM-DD date. */</span>
+<span class="k">export function</span> parse(s: string): Date {
+  <span class="k">const</span> [y, m, d] = s.split(<span class="s">'-'</span>).map(Number);
+  <span class="k">return new</span> Date(y, m - 1, d);
+}
+<span class="k">export function</span> addDays(s: string, n: number): string {
+  <span class="k">const</span> d = parse(s);
+  d.setDate(d.getDate() + n);
+  <span class="k">return</span> iso(d);
+}</pre>
+  <p>Why not <code class="inline">new Date("2026-10-13")</code>? Because JavaScript reads a date-only ISO string as <strong>midnight UTC</strong>. In Amsterdam that prints as the 13th, but for someone in New York it is the evening of the 12th. Building the date from its parts (<code class="inline">new Date(y, m-1, d)</code>) gives local midnight, and keeping strings everywhere else means a task's day is just text that cannot shift.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li><code class="inline">dates.ts</code> also does week numbers (ISO 8601), month arithmetic that clamps 31 January + 1 month to 28 February, and the next occurrence of a repeat. It has unit tests in <code class="inline">dates.test.ts</code>: date code is exactly where tests pay off most.</li>
+      <li>The server never reads the person's zone from their machine; it only has what the page sent. That is why "the calendar shows a task's date and time as stored" and "the time zone decides only when a handed-over task starts" (<code class="inline">docs/work.md</code>).</li>
+      <li>A date already in the past when a task is added starts it at the next pass of the runner. "Now" is not special-cased; "due" simply means <code class="inline">run_at &lt;= now</code>.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Storing only UTC for planned events.</strong> "Every Monday 09:00" stored as "07:00 UTC" drifts by an hour when daylight saving changes. Store the wall-clock plan plus the zone.</li>
+      <li><strong>Storing a fixed offset (<code class="inline">+02:00</code>) instead of a zone name.</strong> An offset is a moment's fact, not a place's rule. <code class="inline">Europe/Amsterdam</code> is +02:00 in summer and +01:00 in winter.</li>
+      <li><strong>Mixing naive and aware datetimes in Python.</strong> Comparing them raises <code class="inline">TypeError</code>. The store's rule: naive in the database means UTC; convert at the edges with <code class="inline">_naive_utc</code>.</li>
+      <li><strong>Pandas habit:</strong> <code class="inline">pd.to_datetime</code> with mixed zones quietly gives <code class="inline">object</code> dtype or converts to UTC. In app code, be explicit at every boundary.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>A weekly task is set for Monday 09:00 Europe/Amsterdam. Daylight saving ends on Sunday. What happens to its <code class="inline">run_at</code>?</summary><p>Each occurrence computes its own <code class="inline">run_at</code> from date + 09:00 + zone, so the UTC instant moves from 07:00 to 08:00 and the task still runs at 09:00 on the wall clock.</p></details>
+  <details class="qa"><summary>Why does an all-day agent task need a <code class="inline">run_at</code> at all?</summary><p>The runner only understands instants. "All day" has no start time, so the store picks one (09:00 local). Without it the task would never come due.</p></details>
+  <details class="qa"><summary>Why is <code class="inline">tz</code> left out of a PATCH that only changes the title?</summary><p>Because a zone change counts as moving the task, and moving a done or failed agent task schedules it again.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise</span>
+    <p>Add <code class="inline">_run_at(day, time, tz)</code> to your Ciao Tutor <code class="inline">planner/store.py</code> and write three tests: 09:00 Amsterdam on 2026-07-01 is 07:00 UTC; on 2026-12-01 it is 08:00 UTC; an all-day task gets 09:00 local. Then answer in a comment: why does your planner store <code class="inline">tz</code> per task rather than per learner?</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Explain wall-clock time vs instants using ../aac-pr-974/src/work/store.py
+(_run_at, default_tz, _naive_utc) and ../aac-pr-974/chatkit/app/src/work/dates.ts.
+Then quiz me with 5 scenarios (DST change, a traveller, an all-day task, a task
+added in the past, JavaScript new Date("2026-10-13")) and check my answers.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 05 API ===== -->
+<section class="sec" id="api" data-title="The API">
+  <p class="eyebrow">Section 05 · Foundations</p>
+  <h1><span class="sec-num">/ 05</span>The API: thin routes over the store</h1>
+  <p class="lede">The routes in <code class="inline">src/api/work.py</code> are deliberately boring. They find out who is calling, turn JSON into Python arguments, call the store, and turn errors into HTTP status codes. Boring routes are a sign the logic lives in the right place.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li><strong>Who</strong> is calling comes from the session (<code class="inline">request.state.user_id</code>), never from the request body.</li>
+      <li><strong>Pydantic models</strong> describe the JSON. For PATCH, <code class="inline">model_dump(exclude_unset=True)</code> tells "the client did not send this field" apart from "the client sent <code class="inline">null</code>".</li>
+      <li><strong>Errors map to codes:</strong> bad input 400, no session 401, not yours or does not exist 404, conflict (already running) 409, no database 503.</li>
+    </ul>
+  </div>
+
+  <h2>The routes</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Route</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td class="k">GET /api/work/tasks?start=&amp;end=</td><td>Dated tasks in range, undated tasks, scheduled routines, open repeating tasks, the person's zone. One call fills the page</td></tr>
+      <tr><td class="k">POST /api/work/tasks</td><td>Add a task → 201 with the task</td></tr>
+      <tr><td class="k">PATCH /api/work/tasks/{id}</td><td>Change the fields sent (also <code class="inline">done</code>, <code class="inline">archived</code>, <code class="inline">position</code>)</td></tr>
+      <tr><td class="k">DELETE /api/work/tasks/{id}</td><td>204</td></tr>
+      <tr><td class="k">POST /api/work/tasks/{id}/run</td><td>"Start now": 202, runs in the background</td></tr>
+      <tr><td class="k">GET /api/work/capabilities</td><td>What this person has: Computer, meetings, Azure DevOps, Claude Code. The page hides what is false</td></tr>
+      <tr><td class="k">GET /api/work/meetings</td><td>Meetings from DevRev for the days on screen</td></tr>
+      <tr><td class="k">POST /api/work/tasks/archive-done</td><td>Archive done tasks</td></tr>
+      <tr><td class="k">GET /api/work/standup · POST …/standup/done</td><td>The standup, and "Held"</td></tr>
+      <tr><td class="k">PUT /api/work/claude-sessions/{id}</td><td>The Claude Code hook files a session</td></tr>
+      <tr><td class="k">/api/work/ado/*</td><td>Azure DevOps view and items (separate file <code class="inline">src/api/work_ado.py</code>)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Who is calling</h2>
+  <pre class="code"><span class="c"># src/api/work.py</span>
+<span class="k">def</span> _user(request: Request) -> str:
+    user_id = getattr(request.state, <span class="s">"user_id"</span>, None)
+    <span class="k">if not</span> user_id <span class="k">or</span> user_id == <span class="s">"default_user"</span>:
+        <span class="k">raise</span> HTTPException(status_code=401, detail=<span class="s">"Not authenticated"</span>)
+    <span class="k">return</span> user_id</pre>
+  <p>An auth middleware (elsewhere in the app) checks the login cookie and puts the user id on <code class="inline">request.state</code>. The route just reads it. <code class="inline">default_user</code> is the shared, unnamed user some old paths use; My work refuses it so nothing is ever written to a calendar that belongs to nobody.</p>
+
+  <h2>PATCH and the "missing vs null" problem</h2>
+  <pre class="code"><span class="k">class</span> TaskPatch(BaseModel):
+    <span class="s">"""The fields to change; one left out stays, ``date``/``time`` null clear."""</span>
+    title: str | None = None
+    date: str | None = None
+    time: str | None = None
+    repeat: str | None = None  <span class="c"># null ends the repeat</span>
+    done: bool | None = None
+    <span class="c"># … the other fields</span>
+
+<span class="nd">@work_router.patch</span>(<span class="s">"/tasks/{task_id}"</span>)
+<span class="k">def</span> update_task(task_id: str, payload: TaskPatch, request: Request):
+    user, db = _user(request), _db()
+    <span class="k">try</span>:
+        task = store.update_task(
+            db, user, task_id, **payload.model_dump(exclude_unset=True)
+        )
+    <span class="k">except</span> store.WorkError <span class="k">as</span> exc:
+        <span class="k">raise</span> _bad_input(exc) <span class="k">from</span> exc
+    <span class="k">if</span> task <span class="k">is</span> None:
+        <span class="k">raise</span> _not_found()
+    <span class="c"># … (Azure DevOps sync when done, section 10)</span></pre>
+  <p>Both <code class="inline">{"title": "x"}</code> and <code class="inline">{"title": "x", "date": null}</code> produce a model where <code class="inline">payload.date is None</code>. But they mean different things: "leave the date" and "remove the date". <code class="inline">exclude_unset=True</code> keeps only the fields the client actually sent, so the store receives <code class="inline">date=None</code> only in the second case. This is the standard trick for partial updates with Pydantic, and forgetting it is a classic bug: every PATCH silently wipes the fields it did not mention.</p>
+
+  <h2>Why plain <code class="inline">def</code> routes?</h2>
+  <p>Most routes are <code class="inline">def</code>, not <code class="inline">async def</code>. The store uses synchronous SQLAlchemy (so the agents' tools, which run in worker threads, can share it). FastAPI runs a plain <code class="inline">def</code> route in a <strong>thread pool</strong>, so a blocking database call does not freeze the server's event loop. If you wrote <code class="inline">async def</code> and called the sync store inside it, every request would block every other request while the database answers. Only "Start now" and meetings are <code class="inline">async</code>, because they <code class="inline">await</code> async things; they wrap sync store calls in <code class="inline">asyncio.to_thread</code>.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li>The routers are mounted in <code class="inline">src/api/chatkit_server.py</code>: <code class="inline">app.include_router(work_router)</code> and <code class="inline">app.include_router(work_ado_router)</code>.</li>
+      <li>"Start now" (<code class="inline">POST …/run</code>) returns <strong>202 Accepted</strong>, not 200: "I took your request; the work happens later." The page then polls every 10 seconds while a task is running (section 13).</li>
+      <li>A system the person does not have (say, Azure DevOps for a non-admin) answers <strong>404</strong>, not 403. To that person, the feature simply does not exist.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Reading <code class="inline">user_id</code> from the body.</strong> Anyone could then edit anyone's calendar. Identity comes from the session.</li>
+      <li><strong>Logic in the route.</strong> If the route checked "a time needs a date", the tools would not get that check. Routes translate; the store decides.</li>
+      <li><strong><code class="inline">async def</code> + blocking calls.</strong> Looks fine with one user on your laptop, freezes under load.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>The page sends <code class="inline">PATCH {"notes": "call Ghent"}</code>. Without <code class="inline">exclude_unset</code>, what would happen?</summary><p><code class="inline">model_dump()</code> would include every field as <code class="inline">None</code>: the store would clear the date, time and repeat, and change the title to None (which the validator refuses with "A title is required"). Either way the edit fails or destroys data.</p></details>
+  <details class="qa"><summary>Why 404 and not 403 for another person's task?</summary><p>403 would confirm that the id exists. 404 reveals nothing. Also, the store's query includes <code class="inline">user_id</code>, so from the store's point of view the task really is not found.</p></details>
+  <details class="qa"><summary>Why does "Start now" answer 202?</summary><p>An agent turn can take minutes. The route claims the task, starts the run in the background and answers at once; the outcome lands on the task and in a chat later.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P2)</span>
+    <p>Add <code class="inline">planner/routes.py</code> to Ciao Tutor with GET, POST, PATCH and DELETE <code class="inline">/api/tasks</code>, using Pydantic <code class="inline">TaskIn</code> and <code class="inline">TaskPatch</code> and <code class="inline">exclude_unset=True</code>. Take the user id from the session the way M2 does for vocab. Map <code class="inline">WorkError</code> → 400 and "not found" → 404. Success: with <code class="inline">curl</code> or <code class="inline">/docs</code>, a PATCH of only the notes leaves the date untouched, and <code class="inline">{"date": null}</code> removes it.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>I added planner/routes.py to Ciao Tutor. Compare it with
+../aac-pr-974/src/api/work.py. Check: where my user id comes from, whether my PATCH
+uses exclude_unset, my status codes, and whether any business rule leaked into a
+route. Then write (but don't run) three curl commands I can use to prove the
+missing-vs-null behaviour, and tell me the response I should expect from each.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 06 RUNNER ===== -->
+<section class="sec" id="runner" data-title="The runner">
+  <p class="eyebrow">Section 06 · Running work in the background</p>
+  <h1><span class="sec-num">/ 06</span>The runner: background jobs without a job queue</h1>
+  <p class="lede">How does a task run at 09:00 when nobody has the page open? A loop inside the backend wakes up every minute, finds what is due, and runs it. Simple, but the details (two servers, crashes, shutdowns) are where the engineering is.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>FastAPI's <strong>lifespan</strong> starts <code class="inline">run_loop</code> as an asyncio task when the server starts, and cancels it when the server stops.</li>
+      <li>Every 60 s a <strong>pass</strong>: end stale runs, then <strong>claim</strong> due tasks and start each one in the background, at most 3 at once per process.</li>
+      <li>A claim is an <code class="inline">UPDATE … WHERE id = ? AND status = 'scheduled'</code>. Only one server's UPDATE can match, so two servers never run the same task. No locks, no queue.</li>
+    </ul>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 780 250" role="img" aria-label="One pass of the runner: sleep 60 seconds, end stale runs older than one hour, claim due tasks with a conditional UPDATE up to the free places, start each as a background asyncio task which runs the agent turn and calls finish with done or failed.">
+      <defs>
+        <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow"/></marker>
+        <marker id="a6h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-arrow hi"/></marker>
+      </defs>
+      <rect x="20" y="40" width="150" height="62" rx="10" class="d-box"/>
+      <text x="95" y="66" text-anchor="middle" class="d-text" font-weight="600">fail_stale</text>
+      <text x="95" y="85" text-anchor="middle" class="d-text sm">running &gt; 1 h → failed</text>
+      <rect x="220" y="40" width="160" height="62" rx="10" class="d-box hi"/>
+      <text x="300" y="66" text-anchor="middle" class="d-text" font-weight="600">claim_due</text>
+      <text x="300" y="85" text-anchor="middle" class="d-text sm">scheduled → running</text>
+      <rect x="430" y="40" width="150" height="62" rx="10" class="d-box"/>
+      <text x="505" y="66" text-anchor="middle" class="d-text" font-weight="600">start(task)</text>
+      <text x="505" y="85" text-anchor="middle" class="d-text sm">asyncio.create_task</text>
+      <rect x="620" y="40" width="140" height="62" rx="10" class="d-box"/>
+      <text x="690" y="66" text-anchor="middle" class="d-text" font-weight="600">sleep 60 s</text>
+      <text x="690" y="85" text-anchor="middle" class="d-text sm">then again</text>
+      <path d="M170 71 L218 71" class="d-line" marker-end="url(#a6)"/>
+      <path d="M380 71 L428 71" class="d-line" marker-end="url(#a6)"/>
+      <path d="M580 71 L618 71" class="d-line" marker-end="url(#a6)"/>
+      <path d="M690 102 C 690 140, 95 140, 95 104" class="d-line" marker-end="url(#a6)"/>
+      <!-- run_task -->
+      <rect x="380" y="170" width="380" height="62" rx="10" class="d-box hi"/>
+      <text x="570" y="196" text-anchor="middle" class="d-text" font-weight="600">run_task (in the background)</text>
+      <text x="570" y="215" text-anchor="middle" class="d-text sm">check access now → chat → agent turn as the person → finish(done | failed)</text>
+      <path d="M505 102 L540 168" class="d-line hi" marker-end="url(#a6h)"/>
+      <text x="200" y="200" text-anchor="middle" class="d-text sm">the loop does not wait for the run;</text>
+      <text x="200" y="217" text-anchor="middle" class="d-text sm">the next pass starts on time</text>
+    </svg>
+    <p class="cap">One pass. Runs are started, not awaited, so a slow agent turn never delays the next pass.</p>
+  </div>
+
+  <h2>Starting the loop with the server</h2>
+  <pre class="code"><span class="c"># src/api/chatkit_server.py, inside the lifespan</span>
+work_loop = None
+<span class="k">if</span> isinstance(store, PostgresStore):
+    <span class="k">from</span> src.work.runner <span class="k">import</span> run_loop
+    work_loop = asyncio.create_task(run_loop(store, server._get_registry))
+
+<span class="k">yield</span>                       <span class="c"># the server serves requests here</span>
+
+<span class="k">if</span> work_loop:
+    work_loop.cancel()
+    <span class="k">with</span> suppress(asyncio.CancelledError):
+        <span class="k">await</span> work_loop</pre>
+  <p>A <strong>lifespan</strong> is a function FastAPI runs around the server's life: the code before <code class="inline">yield</code> at start-up, the code after it at shutdown. Starting the loop here means "the runner lives exactly as long as the backend process".</p>
+
+  <h2>The loop and one pass</h2>
+  <pre class="code"><span class="c"># src/work/runner.py</span>
+INTERVAL_SECONDS = 60
+MAX_CONCURRENT = 3
+_running: set[asyncio.Task] = set()
+
+<span class="k">async def</span> run_due(store, registry) -> list[asyncio.Task]:
+    db = work.engine()
+    <span class="k">if</span> db <span class="k">is</span> None:
+        <span class="k">return</span> []
+    now = datetime.now(UTC)
+    <span class="k">await</span> asyncio.to_thread(work.fail_stale, db, now)
+    free = MAX_CONCURRENT - len(_running)
+    <span class="k">if</span> free &lt;= 0:
+        <span class="k">return</span> []
+    due = <span class="k">await</span> asyncio.to_thread(work.claim_due, db, now, free)
+    <span class="k">return</span> [start(task, store, registry) <span class="k">for</span> task <span class="k">in</span> due]
+
+<span class="k">async def</span> run_loop(store, get_registry) -> None:
+    <span class="k">while</span> True:
+        <span class="k">try</span>:
+            <span class="k">await</span> run_due(store, get_registry())
+        <span class="k">except</span> Exception:
+            logger.exception(<span class="s">"work: a pass over the due tasks failed"</span>)
+        <span class="k">await</span> asyncio.sleep(INTERVAL_SECONDS)
+
+<span class="k">def</span> start(task: dict, store, registry) -> asyncio.Task:
+    run = asyncio.create_task(run_task(task, store, registry))
+    _running.add(run)
+    run.add_done_callback(_running.discard)
+    <span class="k">return</span> run</pre>
+  <p>Four details worth a pause:</p>
+  <ol class="steps">
+    <li><strong><code class="inline">asyncio.to_thread</code>.</strong> The store is synchronous. Calling it directly from async code would block the event loop (and every HTTP request) while Postgres answers. <code class="inline">to_thread</code> runs it in a worker thread and awaits the result.</li>
+    <li><strong>The <code class="inline">try/except</code> around a pass.</strong> If one pass fails (database blip), the loop logs it and tries again in a minute. Without it, one exception would silently kill the runner for good.</li>
+    <li><strong>The <code class="inline">_running</code> set.</strong> The event loop keeps only a <em>weak</em> reference to tasks made with <code class="inline">create_task</code>. If nothing else holds a reference, a running task can be garbage-collected mid-run. Keeping it in a set (and removing it when done) is the documented pattern. It also counts the runs under way for the cap.</li>
+    <li><strong>Capacity.</strong> At most 3 runs per process. What is due beyond that waits for the next pass. Agent turns are expensive (model calls, warehouse queries); a cap protects the server and the model quota.</li>
+  </ol>
+
+  <h2>The claim: safe with two servers</h2>
+  <p>Production runs <strong>two replicas</strong> of the backend, and each runs this loop. Both may see the same due task at the same moment. The claim makes sure only one runs it:</p>
+  <pre class="code"><span class="c"># src/work/store.py</span>
+<span class="k">def</span> _start_run(session: Session, *where) -> bool:
+    <span class="s">"""Mark the task matching ``where`` as running; whether this call did."""</span>
+    taken = session.execute(
+        update(WorkTaskModel)
+        .where(*where)
+        .values(status=<span class="s">"running"</span>, done_at=None, updated_at=_now())
+        .execution_options(synchronize_session=False)
+    )
+    <span class="k">return</span> taken.rowcount == 1
+
+<span class="c"># in claim_due, for each due id t:</span>
+_start_run(session, WorkTaskModel.id == t, WorkTaskModel.status == <span class="s">"scheduled"</span>)</pre>
+  <p>The database runs each UPDATE atomically. The first replica's UPDATE changes the row to <code class="inline">running</code> and reports <code class="inline">rowcount == 1</code>. The second replica's UPDATE finds no row that is still <code class="inline">scheduled</code> and reports 0, so it skips the task. This pattern is called a <strong>conditional update</strong> or <strong>compare-and-set</strong>, and it is a form of <strong>optimistic concurrency</strong>: no lock is held; you just make the write conditional on the state you expect.</p>
+
+  <h2>When things go wrong</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>What happens</th><th>What the runner does</th></tr></thead>
+    <tbody>
+      <tr><td class="k">The agent turn raises</td><td>Task <code class="inline">failed</code>, error in <code class="inline">result</code>, "I could not do this task: …" in the chat</td></tr>
+      <tr><td class="k">A tool fails inside the turn</td><td>Not a failure: the agent reports it in its answer; the task is <code class="inline">done</code> with that answer</td></tr>
+      <tr><td class="k">The server stops gracefully</td><td>The run is cancelled; <code class="inline">CancelledError</code> is caught, the task is ended as <code class="inline">failed</code> ("the server stopped"), and the error is re-raised</td></tr>
+      <tr><td class="k">The server is killed hard</td><td>The task stays <code class="inline">running</code>… until any server's next pass sees it has been running over an hour and fails it (<code class="inline">fail_stale</code>)</td></tr>
+      <tr><td class="k">Both servers were down at 09:00</td><td>The task is still <code class="inline">scheduled</code> with a past <code class="inline">run_at</code>; it starts at the first pass after they are back</td></tr>
+    </tbody>
+  </table></div>
+  <p>That last row is a nice property of "due = <code class="inline">run_at &lt;= now</code>": missed work is never lost, just late. Compare a cron job, which simply does not run if the machine was off at that minute.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li><code class="inline">fail_stale</code> uses the same conditional-update trick, so only one replica ends a stale run and adds the next occurrence of a repeating task.</li>
+      <li>"Start now" (<code class="inline">store.claim</code>) also uses <code class="inline">_start_run</code>, with the condition "not running", so a double click cannot start two runs.</li>
+      <li>The MCP container does <em>not</em> run the loop; only the backend does. One kind of process owns the runner.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>"Read, then write" claims.</strong> <code class="inline">SELECT status</code>, check it in Python, then <code class="inline">UPDATE</code>: between the two, the other server does the same. The check must be <em>inside</em> the UPDATE.</li>
+      <li><strong><code class="inline">await</code>-ing each run inside the loop.</strong> Then one slow turn delays every other due task. Start runs; do not await them.</li>
+      <li><strong>No stale rule.</strong> A process killed mid-run leaves a row <code class="inline">running</code> for ever, and nothing can run it again.</li>
+      <li><strong>Reaching for Celery or a message queue first.</strong> For a few tasks a minute, a table plus a loop is simpler to run and to debug. A queue earns its place when you need thousands of jobs, retries with back-off, or separate worker machines.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Two replicas both run <code class="inline">claim_due</code> at 09:00:00 and see task X. Walk through what happens.</summary><p>Both issue <code class="inline">UPDATE … SET status='running' WHERE id='X' AND status='scheduled'</code>. The database applies one first: its rowcount is 1 and it runs X. The other UPDATE now matches no row (status is no longer scheduled): rowcount 0, so X is not in its claimed list.</p></details>
+  <details class="qa"><summary>Why is the stale limit one hour and not, say, five minutes?</summary><p>An agent turn or a multi-step routine can legitimately take many minutes. Too short a limit would fail runs that are still working. The limit only needs to catch runs whose server died.</p></details>
+  <details class="qa"><summary>What does <code class="inline">asyncio.to_thread</code> protect against here?</summary><p>Blocking the event loop. The sync database call runs in a thread, so the server keeps answering HTTP requests and other runs keep going while it waits.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P3, part 1)</span>
+    <p>In Ciao Tutor, add <code class="inline">planner/runner.py</code> with <code class="inline">run_loop</code>, <code class="inline">run_due</code>, <code class="inline">start</code> and a <code class="inline">claim_due</code> in your store that uses the conditional UPDATE (<code class="inline">cursor.rowcount == 1</code> in sqlite3). Start it from a FastAPI lifespan. For now, make <code class="inline">run_task</code> just sleep 2 seconds and finish the task as done with result "ok". Use <code class="inline">INTERVAL_SECONDS = 10</code> while developing. Success: a tutor task dated a minute ago goes scheduled → running → done within one interval, and a test that calls <code class="inline">claim_due</code> twice on the same due task gets it only once.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Review planner/runner.py and claim_due in my Ciao Tutor planner against
+../aac-pr-974/src/work/runner.py and store.claim_due. Check specifically:
+(1) is my claim a single conditional UPDATE or a read-then-write?
+(2) do I keep references to the tasks I create?
+(3) can one failing pass kill the loop?
+(4) what happens to a running task if I Ctrl+C uvicorn?
+Explain each answer; don't fix the code for me.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 07 HANDOVER ===== -->
+<section class="sec" id="handover" data-title="Handing work to agents">
+  <p class="eyebrow">Section 07 · Running work in the background</p>
+  <h1><span class="sec-num">/ 07</span>Handing work to agents: as the person, in a chat</h1>
+  <p class="lede">The runner claimed a task. Now what exactly does it do? It runs a normal agent turn, the same code as when you type in the chat, but with no one watching. Three design choices make that safe and useful.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li><strong>As the person.</strong> The turn runs under the task owner's user id: their data access, their agents, their tokens. Never as an admin or the server's own identity.</li>
+      <li><strong>Permissions are checked again at run time.</strong> A task added last month must not run if the person has since lost access to that agent.</li>
+      <li><strong>In a chat of its own.</strong> The task's text becomes the person's message, the answer is added marked <em>unread</em>, and the person can carry on the conversation later.</li>
+    </ul>
+  </div>
+
+  <h2>The prompt the agent receives</h2>
+  <pre class="code"><span class="c"># src/work/runner.py</span>
+<span class="k">def</span> _prompt(task: dict) -> str:
+    <span class="s">"""What the agent is asked, in the person's words: the chat shows it as
+    their message. The task first, then where it comes from."""</span>
+    lines = [task[<span class="s">"title"</span>]]
+    <span class="k">if</span> task[<span class="s">"notes"</span>]:
+        lines += [<span class="s">""</span>, task[<span class="s">"notes"</span>]]
+    <span class="c"># … a "Campaign: …" line when the task has a campaign</span>
+    when = (f<span class="s">"{task['date']} {task['time'] or 'all day'} ({task['tz']})"</span>
+            <span class="k">if</span> task[<span class="s">"date"</span>] <span class="k">else</span> <span class="s">"no date"</span>)
+    lines += [<span class="s">""</span>, f<span class="s">"(A task from my calendar in My work, for {when}. Do it now and tell "</span>
+              <span class="s">"me the outcome briefly.)"</span>]
+    <span class="k">return</span> <span class="s">"\n"</span>.join(lines)</pre>
+  <p>The agent gets no special "task mode". It gets an ordinary user message: the title, the notes (the real instruction), and one line of context saying where this came from and that it should act now. That is why the docstring of <code class="inline">add_task</code> tells models: "For an agent's task the notes are its instruction, so write exactly what to do… it works from the notes alone." Nobody can answer a clarifying question at 09:00.</p>
+
+  <h2>One run, step by step</h2>
+  <pre class="code"><span class="c"># src/work/runner.py, run_task (the agent branch, trimmed)</span>
+guard = running_task.set(task[<span class="s">"id"</span>])        <span class="c"># section 08: the loop guard</span>
+<span class="k">try</span>:
+    <span class="k">if</span> agent <span class="k">not in</span> allowed_agents(user):     <span class="c"># checked NOW, not when added</span>
+        <span class="k">raise</span> RuntimeError(f<span class="s">"You no longer have access to the {agent} agent."</span>)
+    thread_id = <span class="k">await</span> _chat_for(task, store, agent, task[<span class="s">"title"</span>])
+    result = <span class="k">await</span> _run_agent(task, store, registry, thread_id)
+    ok = True
+<span class="k">except</span> asyncio.CancelledError:
+    _finish(db, task, ok=False, result=<span class="s">"The run was interrupted: the server stopped."</span>,
+            thread_id=thread_id)
+    <span class="k">raise</span>
+<span class="k">except</span> Exception <span class="k">as</span> exc:
+    ok, result = False, <span class="s">" "</span>.join(str(exc).split()) <span class="k">or</span> type(exc).__name__
+    <span class="c"># … and "I could not do this task: …" in the chat, unread</span>
+<span class="k">finally</span>:
+    running_task.reset(guard)
+_finish(db, task, ok=ok, result=result, thread_id=thread_id)</pre>
+  <ol class="steps">
+    <li><strong>Find or make the chat.</strong> If the task ran before and its chat still exists, reuse it (a repeating task builds one conversation). Otherwise create a new chat titled like the task, marked as started by an agent.</li>
+    <li><strong>Add the prompt as the person's message</strong>, then run one turn with <code class="inline">run_turn(TurnRequest(user_id=…, agent_id=…, channel="work"))</code>. <code class="inline">channel="work"</code> labels the traces so you can tell scheduled runs from typed ones.</li>
+    <li><strong>Add the answer</strong> with <code class="inline">unread=True</code>. The chat appears under Unread in the chat list; that is the only "notification".</li>
+    <li><strong>Record the outcome</strong> on the task: <code class="inline">done</code> with the answer cut to 400 characters as <code class="inline">result</code> (the chat has it whole), or <code class="inline">failed</code> with the error. <code class="inline">thread_id</code> is saved so the card can open the chat.</li>
+  </ol>
+
+  <h2>Routines: a workflow, step by step, in one chat</h2>
+  <p>A routine task runs a workflow from the Routines tab: several stages, each with its own agent and prompt containing <code class="inline">[Placeholders]</code> (like <code class="inline">[Retailer]</code>). The values were filled in when the task was scheduled. The runner fills them into each stage's prompt and runs the stages <em>in order in the same chat</em>, so stage 3 can read what stages 1 and 2 answered. The first failing stage stops the run: <code class="inline">"Step 2 of 4 (name) failed: …"</code>. This is <strong>prompt chaining</strong> from your main study guide, run on a schedule.</p>
+
+  <h2>Computer: someone else's agent, with an approval card</h2>
+  <p>A Computer task does not run a platform agent at all. It sends the question to DevRev's agent using the person's own DevRev token. If DevRev wants approval before acting (sending an email, say), the chat gets an <strong>Approve / Decline</strong> card and the task is marked done with "Computer waits for your approval in this task's chat." Nothing is sent until the person clicks. This is a <strong>human-in-the-loop gate</strong> for an action that is hard to undo.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li><code class="inline">_routine_to_run</code> re-checks, at run time, that the workflow still exists, every placeholder still has a value and the person may still use every stage's agent.</li>
+      <li>Warehouse reads inside a scheduled turn use the person's own warehouse token, renewed silently from their sign-in cache. If that sign-in has expired (a week, or a Redis restart), the reads are <em>refused</em>, never done as the service identity. The agent says so and the person signs in and runs it again (<code class="inline">docs/work.md</code>, Limits).</li>
+      <li>The runner puts no time limit on a turn; the one-hour stale rule is the backstop.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Running background work as an admin "because it's easier".</strong> Then a scheduled task can read data the person cannot. Always run as the owner.</li>
+      <li><strong>Checking permission only when the task is added.</strong> This is a <em>time-of-check vs time-of-use</em> bug: the world changes between scheduling and running.</li>
+      <li><strong>Vague notes for a scheduled agent.</strong> "Check the campaign" works in a live chat because you can answer follow-ups. At 09:00, nobody answers. Write the full instruction.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>A Monitor task is scheduled for Friday. On Thursday an admin removes your access to Monitor. What happens on Friday?</summary><p>The runner checks <code class="inline">allowed_agents</code> at run time, raises "You no longer have access to the monitor agent", and the task ends <code class="inline">failed</code> with that message.</p></details>
+  <details class="qa"><summary>Why put the task's text into the chat as <em>the person's</em> message?</summary><p>So the chat reads naturally ("me: check stock risk for 9111 / agent: …") and the person can continue the conversation from there, and so the agent's normal behaviour (history, tools, rules) applies unchanged.</p></details>
+  <details class="qa"><summary>A tool inside the turn throws an error. Is the task failed?</summary><p>No. The agent sees the tool error, reports it in its answer, and the turn completes normally, so the task is <code class="inline">done</code> with that answer as its result. Only a turn that raises fails the task.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P3, part 2)</span>
+    <p>Replace the sleeping <code class="inline">run_task</code> with real work. For <code class="inline">assignee="tutor"</code>: build the prompt like <code class="inline">_prompt</code>, run one tutor-chat turn as the learner, and save the question and answer as a new conversation the page can open later (a small <code class="inline">planner_chats</code> table is enough). For <code class="inline">assignee="lesson"</code>: call your M3 <code class="inline">make_lesson()</code> flow and store the lesson; the result line is the lesson's title. Wrap the work in try/except and finish the task done or failed. Success: a task "Explain the passato prossimo with 3 examples" for the tutor runs by itself and its answer appears in your saved chats; a task whose run raises shows <code class="inline">failed</code> with the message.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Read ../aac-pr-974/src/work/runner.py (run_task, _prompt, _chat_for, _run_agent,
+_run_routine). Then read my planner/runner.py in Ciao Tutor.
+Tell me which of these my version does and which it is missing:
+runs as the task's owner, re-checks access at run time, writes the prompt as the
+user's message, marks the answer unread, records thread/result on the task,
+handles CancelledError. For each one I'm missing, ask me what could go wrong
+before you explain it.</pre>
+  </div>
+</section>
+<!-- ===================================================== 08 TOOLS ===== -->
+<section class="sec" id="tools" data-title="Agents using the calendar">
+  <p class="eyebrow">Section 08 · Agents</p>
+  <h1><span class="sec-num">/ 08</span>Agents using the calendar: the task tools</h1>
+  <p class="lede">"Remind me to call Ghent on Thursday" in any chat puts a task on your calendar. That is the second door into the store: a handful of tools whose docstrings teach the model when and how to use them.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>Six tools in <code class="inline">src/agent/tools_work.py</code> (<code class="inline">list_my_tasks</code>, <code class="inline">add_task</code>, <code class="inline">list_routines</code>, <code class="inline">update_task</code>, <code class="inline">delete_task</code>, <code class="inline">standup</code>) plus three Azure DevOps tools. Every agent has them.</li>
+      <li>A tool <strong>never takes the user id as an argument</strong>. It finds the person from the turn it runs in. A tool that cannot tell who the person is refuses.</li>
+      <li>Tools return <strong>plain text</strong> the model can read: what was done and the task id, or <code class="inline">"Not added: &lt;why&gt;"</code>.</li>
+      <li>A <strong>loop guard</strong> stops an agent that is itself running a scheduled task from handing out more work to agents. Otherwise tasks could multiply.</li>
+    </ul>
+  </div>
+
+  <h2>The docstring is the prompt</h2>
+  <p>The model never reads the function body. It reads the name, the arguments and the docstring. So the docstring is written for a model, with rules about <em>when</em> to use the tool and what to say back:</p>
+  <pre class="code"><span class="c"># src/agent/tools_work.py (excerpt of add_task's docstring)</span>
+<span class="s">"""Add a task to the user's My work calendar.
+
+Use assignee "me" for a reminder or to-do the user does themselves. Use an
+agent's slug ("monitor", "prepare", "research", ...) to have that agent do
+the task as the user at that date and time: ... For an agent's task the notes
+are its instruction, so write exactly what to do and for which campaign; it
+works from the notes alone. ...
+Dates and times are the user's local time. If you do not know today's date,
+call list_my_tasks first: it says. ... Say back the date and time you set.
+
+When the user describes work that repeats ("every Monday I ..."), offer to
+put it on their calendar as a repeating task, ... and ask before you add it.
+Never schedule something that sends anything outside the company unless the
+user asked for it.
+"""</span></pre>
+  <p>Look at the problems each sentence solves. Models do not know today's date, so <code class="inline">list_my_tasks</code> starts its answer with "Today is Tuesday 2026-10-13 (Europe/Amsterdam)" and <code class="inline">add_task</code> tells the model to call it first. Models guess silently, so "say back the date and time you set" lets the person catch a wrong Thursday. "Ask before you add" and "never schedule something that sends anything outside the company" are guardrails in plain words.</p>
+
+  <h2>Who is the person?</h2>
+  <pre class="code"><span class="c"># src/agent/tools_work.py</span>
+<span class="k">def</span> _person():
+    <span class="s">"""``(database, the person's user id, how the call came in)``, or the
+    reason there is none."""</span>
+    db = engine()
+    <span class="k">if</span> db <span class="k">is</span> None:
+        <span class="k">return</span> <span class="s">"My work is not available here (no platform database)."</span>
+    who = caller()                   <span class="c"># set when the call came over MCP</span>
+    <span class="k">if</span> who <span class="k">is not</span> None:
+        <span class="k">return</span> (db, who.email, <span class="s">"mcp"</span>) <span class="k">if</span> who.email <span class="k">else</span> _NOT_A_PERSON
+    user = current_turn().user_id     <span class="c"># set when the call came from a chat</span>
+    <span class="k">return</span> _NOT_A_PERSON <span class="k">if</span> user == DEFAULT_USER_ID <span class="k">else</span> (db, user, <span class="s">"chat"</span>)</pre>
+  <p>The identity comes from the <strong>harness</strong> (the code around the model), never from the model's arguments. If <code class="inline">user_id</code> were an argument, a confused or manipulated model could write onto someone else's calendar. This is the same rule as <code class="inline">save_vocab</code> in your main guide's guardrails section.</p>
+
+  <h2>Returning text, not raising</h2>
+  <pre class="code">    <span class="k">try</span>:
+        task = store.create_task(db, user, title=title, ..., created_via=via)
+    <span class="k">except</span> store.WorkError <span class="k">as</span> exc:
+        <span class="k">return</span> f<span class="s">"Not added: {exc}"</span>
+    ...
+    <span class="k">return</span> (f<span class="s">"Added “{task['title']}”: {_when(task)} ({task['tz']}), for "</span>
+            f<span class="s">"... {task['status']}.{ran}{again}\nTask ID: {task['id']}"</span>)</pre>
+  <p>A tool that raises gives the model a stack trace or nothing. A tool that returns <code class="inline">"Not added: “9:5” is not a time; use HH:MM, 00:00 to 23:59."</code> gives the model exactly what it needs to fix its call. Returning the <strong>task id</strong> matters too: the next tool call (<code class="inline">update_task</code>) needs it.</p>
+
+  <h2>The loop guard</h2>
+  <p>Picture this: a scheduled Monitor task says "check stock and plan follow-ups". Monitor calls <code class="inline">add_task(assignee="monitor", …)</code> for tomorrow. Tomorrow, that task does the same. You now have an agent scheduling itself forever. The guard:</p>
+  <pre class="code"><span class="c"># src/work/__init__.py</span>
+running_task: ContextVar[str | None] = ContextVar(<span class="s">"work_running_task"</span>, default=None)
+
+<span class="c"># src/work/runner.py, run_task</span>
+guard = running_task.set(task[<span class="s">"id"</span>])
+<span class="k">try</span>: ...
+<span class="k">finally</span>:
+    running_task.reset(guard)
+
+<span class="c"># src/agent/tools_work.py</span>
+<span class="k">def</span> _may_assign(assignee: str) -> bool:
+    <span class="s">"""An agent working on a task for the person may not hand out more work."""</span>
+    <span class="k">return not</span> (running_task.get() <span class="k">and</span> assignee.strip().lower() <span class="k">not in</span> (<span class="s">""</span>, <span class="s">"me"</span>))</pre>
+  <p>A <strong><code class="inline">ContextVar</code></strong> is like a global variable, but each asyncio task (and each thread started with <code class="inline">asyncio.to_thread</code>, which copies the context) sees its own value. The runner sets it to the task id for the duration of the run; everything that runs inside that run, including the tools, can read it; a normal chat turn in the same process sees <code class="inline">None</code>. So during a scheduled run the tools still allow reminders for the person (<code class="inline">assignee="me"</code>) but refuse to hand work to agents, routines or Computer.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li>Each agent definition in <code class="inline">src/agent/definitions/*.py</code> lists the tool names, and the functions are registered in <code class="inline">src/agent/tools/__init__.py</code>. A test checks every agent has them.</li>
+      <li><code class="inline">src/agent/base.py</code> maps tool names to progress labels shown in the chat ("Reading your tasks", "Adding task '…'").</li>
+      <li>The page reloads tasks after every chat answer, using the same counter that refreshes the chat list, so a task an agent added from the floating chat appears at once.</li>
+      <li>Over MCP (DevRev, Copilot), the default (<code class="inline">mcp.expose: agents</code>) mounts only <code class="inline">consult_agent</code>, <code class="inline">task_get</code> and <code class="inline">task_cancel</code>; outside clients reach My work through an agent, as the caller.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Docstrings written for humans.</strong> "Adds a task." does not say when, in which time zone, or what to confirm. Write the docstring as instructions to the model.</li>
+      <li><strong>Trusting the model with dates.</strong> Give it a way to learn today's date and make it say the date back.</li>
+      <li><strong>Unbounded delegation.</strong> Any system where agents can create work for agents needs a guard, a depth limit or a budget.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why does <code class="inline">list_my_tasks</code> begin with today's date?</summary><p>The model does not know what day it is. To turn "Thursday" into <code class="inline">2026-10-15</code> it needs today's date in the person's zone, so the tool provides it and <code class="inline">add_task</code>'s docstring tells the model to call it first.</p></details>
+  <details class="qa"><summary>During a scheduled Research run, the agent calls <code class="inline">add_task(assignee="me", title="Read the report")</code>. Allowed?</summary><p>Yes. The guard only refuses assignees other than "me". A reminder for the person cannot cause a loop.</p></details>
+  <details class="qa"><summary>Why a ContextVar rather than a global <code class="inline">CURRENT_TASK = None</code>?</summary><p>Several runs and normal chats happen at once in one process. A global would leak one run's value into another chat. A ContextVar is per asyncio task, so each run sees only its own value.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P4)</span>
+    <p>Give the Ciao Tutor chat agent two new tools: <code class="inline">list_my_tasks(start, end)</code>, whose answer starts with today's date, and <code class="inline">add_task(title, date, time, assignee, notes, repeat)</code>. The user id comes from the session, not the arguments. Return <code class="inline">"Not added: …"</code> on a <code class="inline">WorkError</code>. Add the loop guard with a <code class="inline">ContextVar</code> set in your runner. Success: "remind me to review my verbs on Friday at 18:00" adds the right task and the answer says the date; a test proves that during a run, <code class="inline">add_task(assignee="tutor")</code> is refused and <code class="inline">assignee="me"</code> works.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Read the docstrings of add_task and list_my_tasks in
+../aac-pr-974/src/agent/tools_work.py. Then read the two tools I added to Ciao
+Tutor. Grade my docstrings as instructions for a model: when to call, what to say
+back, guardrails. Suggest 5 test prompts that would catch a weak docstring
+(wrong date, missing confirmation, scheduling outside the company...).</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 09 REPEAT ===== -->
+<section class="sec" id="repeat" data-title="Repeating tasks">
+  <p class="eyebrow">Section 09 · Features</p>
+  <h1><span class="sec-num">/ 09</span>Repeating tasks: one real row at a time</h1>
+  <p class="lede">"Every weekday at 08:00" sounds like it needs a recurrence engine. My work does it with one rule: when a repeating task finishes, add the next one.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>A repeat is one of <code class="inline">daily</code>, <code class="inline">weekdays</code>, <code class="inline">weekly</code>, <code class="inline">biweekly</code>, <code class="inline">monthly</code>, and needs a date.</li>
+      <li>Only <strong>one open task per series</strong> exists in the database. When it finishes (ticked, or a run ends done/failed/stale), <code class="inline">_add_next</code> copies it to the next date.</li>
+      <li>The page draws the coming dates <strong>faded</strong>, computed in the browser. They are not tasks yet.</li>
+    </ul>
+  </div>
+
+  <h2>Two ways to model recurrence</h2>
+  <div class="cards">
+    <div class="card"><span class="tag">Rule-based (iCalendar RRULE)</span><h3>Store the rule, expand on read</h3><p>One row: "FREQ=WEEKLY;BYDAY=MO". To show next month, expand it. Exceptions ("skip 25 Dec", "move this one") need extra tables. Powerful, complex.</p></div>
+    <div class="card"><span class="tag">Materialise next (My work)</span><h3>One real row; make the next on finish</h3><p>Each occurrence is a normal task with its own status, result and chat. Moving one moves only that one. Simple, and every occurrence can run, fail and be retried on its own.</p></div>
+  </div>
+  <p>For a calendar where occurrences <em>run</em> and have outcomes, the second fits much better: the runner never needs to know about rules, it only sees ordinary scheduled tasks.</p>
+
+  <pre class="code"><span class="c"># src/work/store.py</span>
+<span class="k">def</span> next_occurrence(day, repeat, after=None):
+    <span class="k">def</span> step(d):
+        <span class="k">if</span> repeat == <span class="s">"monthly"</span>:
+            year, month = d.year + d.month // 12, d.month % 12 + 1
+            <span class="k">return</span> dt.date(year, month, min(d.day, calendar.monthrange(year, month)[1]))
+        d += timedelta(days={<span class="s">"weekly"</span>: 7, <span class="s">"biweekly"</span>: 14}.get(repeat, 1))
+        <span class="k">while</span> repeat == <span class="s">"weekdays"</span> <span class="k">and</span> d.weekday() > 4:
+            d += timedelta(days=1)
+        <span class="k">return</span> d
+    nxt = step(day)
+    <span class="k">while</span> after <span class="k">is not</span> None <span class="k">and</span> nxt &lt;= after:   <span class="c"># never come back in the past</span>
+        nxt = step(nxt)
+    <span class="k">return</span> nxt</pre>
+  <p>Two subtle rules are in here. <strong>Monthly clamps</strong>: 31 January → 28 February → 28 March (it keeps the clamped day from then on, as the doc says). <strong><code class="inline">after</code> = today</strong>: if a daily task was ticked three days late, the next one is tomorrow, not the day after the old date, which is already in the past.</p>
+
+  <h2>One open task per series</h2>
+  <pre class="code"><span class="k">def</span> _add_next(session, done):
+    <span class="k">if not</span> done.repeat <span class="k">or</span> done.date <span class="k">is</span> None:
+        <span class="k">return</span>
+    series = done.series_id = done.series_id <span class="k">or</span> done.id
+    <span class="k">if</span> session.execute(select(WorkTaskModel.id).where(
+            WorkTaskModel.user_id == done.user_id,
+            WorkTaskModel.series_id == series,
+            WorkTaskModel.status.in_(OPEN_STATES),       <span class="c"># open, scheduled, running</span>
+            WorkTaskModel.id != done.id).limit(1)).first():
+        <span class="k">return</span>                                          <span class="c"># the series already has a next one</span>
+    today = datetime.now(ZoneInfo(done.tz)).date()
+    day = next_occurrence(done.date, done.repeat, today)
+    session.add(WorkTaskModel(... a copy with date=day, series_id=series,
+                              status="scheduled" or "open", run_at=...))</pre>
+  <p>Why the "already has an open one" check? Tick a daily task done, untick it, tick it again: without the check you would get two "tomorrows". The check makes <code class="inline">_add_next</code> <strong>idempotent</strong> per series: calling it twice has the same effect as once. Idempotency is the single most useful property for anything that may be retried or raced, in apps and in data pipelines alike.</p>
+
+  <h2>The faded future, drawn by the page</h2>
+  <pre class="code"><span class="c">// Calendar.tsx: the coming days of every open repeating task</span>
+<span class="k">for</span> (<span class="k">const</span> t <span class="k">of</span> series.values()) {
+  <span class="k">for</span> (<span class="k">const</span> d <span class="k">of</span> occurrencesUntil(t.date!, t.repeat!, range.end)) {
+    <span class="k">if</span> (d >= range.start) out.push({ ...t, id: <span class="s">`${t.id}${VIRTUAL}${d}`</span>, date: d, ... });
+  }
+}</pre>
+  <p>The browser takes the earliest open task of each series and repeats the same date rule up to the end of the visible range (at most 62 per series), giving each a fake id like <code class="inline">wt_abc123@2026-10-20</code>. Those can be opened but not dragged; they become real only when the server adds them. The browser and the server must use the <em>same</em> rule, which is why <code class="inline">dates.ts</code> has its own <code class="inline">nextOccurrence</code> and tests.</p>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Creating a year of rows up front.</strong> Then changing the time of "every Monday" means updating 52 rows, and deleting the series is a bulk operation.</li>
+      <li><strong>A repeat is not a retry.</strong> A failed run still brings the next occurrence; the failed one stays failed until moved or run again.</li>
+      <li><strong>Monthly via <code class="inline">+30 days</code>.</strong> Drifts through the month. Use calendar months and clamp.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>A <code class="inline">weekdays</code> task dated Friday is done on Friday. What is the next date?</summary><p>Monday: step adds a day (Saturday), then skips Saturday and Sunday.</p></details>
+  <details class="qa"><summary>How do you stop a series?</summary><p>Set the open task's repeat to none (or delete it). With no open repeating task left, nothing adds another.</p></details>
+  <details class="qa"><summary>Why does the next occurrence keep the same <code class="inline">position</code>?</summary><p>So a task you placed first in your day's list stays first on its next day too.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P5)</span>
+    <p>Add <code class="inline">repeat</code> and <code class="inline">series_id</code> to <code class="inline">study_tasks</code>, implement <code class="inline">next_occurrence</code> and <code class="inline">_add_next</code>, and call it from both "ticked done" and the runner's finish. Then schedule the real thing: a <code class="inline">lesson</code> task, <code class="inline">weekdays</code> at 08:00. Success: tests for daily, weekdays-over-a-weekend, monthly from 31 January, a task ticked three days late, and tick → untick → tick giving exactly one next task.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Give me 8 tricky test cases for next_occurrence and _add_next (like the ones in
+../aac-pr-974/tests/test_work.py for repeats), as a table of input → expected
+output, WITHOUT the code. I'll write the tests in Ciao Tutor's tests/ myself,
+then you review them.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 10 PORTS ===== -->
+<section class="sec" id="ports" data-title="Ports and adapters">
+  <p class="eyebrow">Section 10 · Outside systems</p>
+  <h1><span class="sec-num">/ 10</span>Ports and adapters: Azure DevOps, meetings, Claude Code</h1>
+  <p class="lede">The calendar talks to three outside systems. Each can be slow, down, or not available to this person. The design question is: how do you add them without the core code knowing or caring?</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>A <strong>port</strong> is an interface the core defines: "what I need from a work item system" (<code class="inline">WorkItemSource</code>), "what I need from a calendar" (<code class="inline">CalendarSource</code>). An <strong>adapter</strong> implements it for one real system.</li>
+      <li><code class="inline">integrations.sources_for(user_id)</code> is the one door: it hands back the adapters this person may use, or <code class="inline">None</code>. Config decides who gets what.</li>
+      <li>Failures are typed (<code class="inline">SourceUnavailableError</code>, <code class="inline">NotYoursError</code>, <code class="inline">NoSuchItemError</code>) and mapped to HTTP codes in one place. Reads <strong>degrade</strong> (200 with an <code class="inline">error</code> field) instead of failing the page.</li>
+    </ul>
+  </div>
+
+  <h2>The idea: hexagonal architecture</h2>
+  <p>Also called <strong>ports and adapters</strong>. The core (store, standup, routes) depends only on small interfaces. The messy specifics (Azure DevOps's WIQL, DevRev's API) live in adapters at the edge. You can swap Azure DevOps for Jira by writing one new adapter, and you can test the core with a fake adapter that needs no network.</p>
+  <pre class="code"><span class="c"># src/work/ports.py (trimmed)</span>
+<span class="k">class</span> SourceError(Exception): ...
+<span class="k">class</span> SourceUnavailableError(SourceError): ...   <span class="c"># no identity, no connection</span>
+<span class="k">class</span> NotYoursError(SourceError): ...           <span class="c"># neither assigned to nor created by the person</span>
+<span class="k">class</span> NoSuchItemError(SourceError): ...
+
+<span class="k">class</span> WorkItemSource(Protocol):
+    <span class="k">def</span> list_items(self, user_id: str, *, state=None, include_closed=False) -> dict: ...
+    <span class="k">def</span> update_item(self, user_id: str, item_id, patch: dict) -> dict: ...
+    <span class="k">def</span> task_done(self, user_id: str, before: dict, after: dict) -> dict: ...
+    <span class="k">def</span> standup_entries(self, user_id: str, since: datetime) -> StandupParts: ...
+    <span class="c"># … who_am_i, unavailable, get_view, save_view, get_states, create_item</span>
+
+<span class="k">class</span> CalendarSource(Protocol):
+    <span class="k">async def</span> meetings(self, user_id: str, start: dt.date, end: dt.date) -> dict: ...</pre>
+  <p>A <code class="inline">typing.Protocol</code> is structural typing ("duck typing with a type checker"): any class with these methods <em>is</em> a <code class="inline">WorkItemSource</code>, no inheritance needed. Think of it as the scikit-learn estimator contract: anything with <code class="inline">fit</code> and <code class="inline">predict</code> works in a <code class="inline">Pipeline</code>.</p>
+
+  <h2>Who gets which system</h2>
+  <pre class="code"><span class="c"># src/work/integrations.py</span>
+_DEFAULT_WHO = {<span class="s">"ado"</span>: <span class="s">"admins"</span>, <span class="s">"claude"</span>: <span class="s">"admins"</span>, <span class="s">"devrev_meetings"</span>: <span class="s">"everyone"</span>}
+
+<span class="k">def</span> allowed(name: str, user_id: str) -> bool:
+    who = config_get(f<span class="s">"work.integrations.{name}.who"</span>, _DEFAULT_WHO[name])
+    <span class="k">if</span> who == <span class="s">"everyone"</span>: <span class="k">return</span> True
+    <span class="k">if</span> who == <span class="s">"admins"</span>: <span class="k">return</span> access_policy.is_admin(user_id)
+    <span class="k">if</span> isinstance(who, list):
+        <span class="k">return</span> str(user_id).strip().lower() <span class="k">in</span> {str(e).strip().lower() <span class="k">for</span> e <span class="k">in</span> who}
+    <span class="k">return</span> False                       <span class="c"># anything else grants nobody</span>
+
+<span class="k">def</span> sources_for(user_id: str) -> dict:
+    <span class="k">return</span> {
+        <span class="s">"work_items"</span>: AzureDevOpsSource() <span class="k">if</span> allowed(<span class="s">"ado"</span>, user_id) <span class="k">else</span> None,
+        <span class="s">"calendar"</span>: DevRevMeetings() <span class="k">if</span> allowed(<span class="s">"devrev_meetings"</span>, user_id) <span class="k">else</span> None,
+        <span class="s">"claude"</span>: allowed(<span class="s">"claude"</span>, user_id),
+    }</pre>
+  <p>Note the last line of <code class="inline">allowed</code>: a typo in config (<code class="inline">who: admin</code>) grants <em>nobody</em>, not everybody. That is <strong>fail closed</strong>. This is why you, on your laptop, got the Azure DevOps section at all: the local dev user counts as an admin.</p>
+
+  <h2>Azure DevOps: writing with the platform's identity, safely</h2>
+  <p>There is no per-person Azure DevOps token. The server's own identity (the VM's managed identity on dev and prod, your <code class="inline">az login</code> on a laptop) reads and writes. That is powerful, so the adapter adds three protections:</p>
+  <ol class="steps">
+    <li><strong>"Me" is never what the request says.</strong> It is the signed-in email, or <code class="inline">work.ado.me</code> for the local dev user. That is the error you hit earlier: without <code class="inline">work.ado.me</code> the adapter does not know who you are, so it refuses (<code class="inline">SourceUnavailableError</code>) rather than guess.</li>
+    <li><strong>Only your own items change.</strong> An item must be assigned to you or created by you, or the write raises <code class="inline">NotYoursError</code> (403).</li>
+    <li><strong>Every write leaves a comment</strong> on the item: <code class="inline">Changed in My work by &lt;email&gt;: …</code>, because Azure DevOps itself will show the platform identity as the author. This is an <strong>audit trail</strong>.</li>
+  </ol>
+
+  <h3>Query injection, the WIQL edition</h3>
+  <p>Azure DevOps is queried with WIQL, a SQL-like language. A person's view has a project name, team name and states they type. If those went into the query as text, a state named <code class="inline">x') OR ([System.Id] &gt; 0</code> would rewrite the query: the same attack as SQL injection. The defence is in two layers:</p>
+  <pre class="code"><span class="c"># src/work/adapters/ado.py</span>
+_NAME = re.compile(<span class="s">r"\w[\w .&amp;()-]{0,62}"</span>)   <span class="c"># names: letters, digits, spaces, . &amp; ( ) -</span>
+
+<span class="k">def</span> _q(text) -> str:
+    <span class="s">"""A WIQL string literal."""</span>
+    <span class="k">return</span> <span class="s">"'"</span> + str(text).replace(<span class="s">"'"</span>, <span class="s">"''"</span>) + <span class="s">"'"</span></pre>
+  <p>First an <strong>allowlist</strong>: a name with quotes or brackets is refused before it is saved. Then <strong>quoting</strong>: every value is a properly escaped string literal. The sprint and project use WIQL macros (<code class="inline">@CurrentIteration</code>, <code class="inline">@project</code>) instead of text. Use parameters when the query language has them; when it does not, validate and quote.</p>
+
+  <h2>Meetings: a heuristic, isolated in its adapter</h2>
+  <p>Meetings come from DevRev, which mirrors your Outlook. DevRev keeps cancelled meetings and, when a meeting moves, sometimes keeps the old copy too. <code class="inline">_current()</code> in <code class="inline">devrev_meetings.py</code> cleans that up with rules (drop cancelled; within a title, keep the last-changed copy per day; drop a stale copy close to a fresh one in a weekly series). It reads three weeks either side of what you asked so it can see the rhythm of a series. Messy, but it is all <em>inside the adapter</em>: no other file knows DevRev has this quirk.</p>
+
+  <h2>Degrade, don't fail</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Situation</th><th>Answer</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Person may not use the system</td><td>404 (routes), "Not available" (tools), left out (standup), hidden (page)</td></tr>
+      <tr><td class="k">System unreachable on a read</td><td>200 with <code class="inline">error</code> set; the page shows the reason in the section, the calendar still works</td></tr>
+      <tr><td class="k">System refuses a write</td><td>502; no connection or identity at all: 503</td></tr>
+      <tr><td class="k">Item not yours / not found</td><td>403 / 404</td></tr>
+    </tbody>
+  </table></div>
+  <p>Caches are small and per process: Azure DevOps items 60 seconds per person and view (cleared when the person changes an item), a type's states one hour, meetings five minutes. A simple dict of <code class="inline">key → (time stored, value)</code>, checked with <code class="inline">time.monotonic()</code>.</p>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Calling the outside API from the route.</strong> Then the route, the tools and the standup each grow their own copy of the integration.</li>
+      <li><strong>One error type for everything.</strong> The caller cannot choose between "show a sign-in button" and "show 'not yours'".</li>
+      <li><strong>Letting one outside failure break the page.</strong> The calendar must work when Azure DevOps is down.</li>
+      <li><strong>Fail-open config.</strong> An unknown value must grant nobody.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why did you see "Azure DevOps does not know the local dev user" instead of your tickets?</summary><p>The local dev user has no email. <code class="inline">me()</code> reads <code class="inline">work.ado.me</code> from <code class="inline">config.local.yaml</code> for that user; it was empty (and the worktree had no <code class="inline">config.local.yaml</code>), so <code class="inline">_session</code> raised <code class="inline">SourceUnavailableError</code> with that message, which the section displays.</p></details>
+  <details class="qa"><summary>What would it take to give a team Jira instead of Azure DevOps?</summary><p>A <code class="inline">JiraSource</code> class with the <code class="inline">WorkItemSource</code> methods, and a branch in <code class="inline">sources_for</code> that hands it to the people configured for it. The routes, tools, standup and page do not change.</p></details>
+  <details class="qa"><summary>Why validate names with a regex if they are quoted anyway?</summary><p>Defence in depth. Quoting is the main protection; the allowlist means even a quoting bug cannot be exploited with names that cannot contain quotes or brackets.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P8, optional)</span>
+    <p>Define a <code class="inline">CalendarSource</code> Protocol in Ciao Tutor and two adapters: <code class="inline">FakeCalendar</code> (two hard-coded Italian classes a week) and <code class="inline">IcsCalendar</code>, which reads <code class="inline">VEVENT</code> blocks from a local <code class="inline">.ics</code> file with the standard library. Add <code class="inline">GET /api/meetings?start=&amp;end=</code> that uses whichever source config names, and returns <code class="inline">{"meetings": [], "error": "…"}</code> with status 200 if the file is missing. Success: the route works with both adapters and no other file mentions <code class="inline">.ics</code>.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Explain ports and adapters using ../aac-pr-974/src/work/ports.py,
+integrations.py and adapters/. Then trace one request end to end:
+PATCH /api/work/ado/items/1349 {"state": "Done"} — which files run, which
+checks happen, which errors are possible and what HTTP code each becomes.
+Draw it as a numbered list. Don't change code.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 11 STANDUP ===== -->
+<section class="sec" id="standup" data-title="The standup">
+  <p class="eyebrow">Section 11 · Features</p>
+  <h1><span class="sec-num">/ 11</span>The standup: a report from many sources</h1>
+  <p class="lede">The standup panel answers three questions: what did I do since my last standup, what am I doing today, what is blocking me. It is a small, clean example of building a report from several sources that may fail independently.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>Three lists (<strong>Done</strong>, <strong>Today</strong>, <strong>Blockers</strong>) of one entry shape, <code class="inline">StandupEntry</code>, from tasks and from the work item source.</li>
+      <li>A source that cannot be read is <strong>left out and named in <code class="inline">warnings</code></strong>. The standup itself never fails.</li>
+      <li>The same report is a JSON API for the panel, Markdown for "copy" and for the <code class="inline">standup</code> tool, so "what did I do since Friday?" works in any chat.</li>
+    </ul>
+  </div>
+
+  <h2>Where each line comes from</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>List</th><th>From tasks</th><th>From Azure DevOps</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Done</td><td>Done since the start, archived ones too</td><td>Items now Resolved/Completed whose state changed since; your PRs completed since</td></tr>
+      <tr><td class="k">Today</td><td>Open, scheduled or running tasks dated today</td><td>Items in an InProgress state; your open PRs</td></tr>
+      <tr><td class="k">Blockers</td><td>Failed runs since the start; Computer tasks waiting for approval</td><td>Items in state Blocked or tagged <code class="inline">blocked</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>"Since when?"</h2>
+  <pre class="code"><span class="c"># src/work/standup.py</span>
+<span class="k">def</span> default_since(db, user_id, now):
+    day = now.date() - timedelta(days=1)
+    <span class="k">while</span> day.weekday() > 4:              <span class="c"># Monday: Friday</span>
+        day -= timedelta(days=1)
+    since = datetime.combine(day, dt.time.min, tzinfo=now.tzinfo)
+    last = store.get_settings(db, user_id).get(<span class="s">"last_standup_at"</span>)
+    <span class="k">if</span> last:
+        ...
+        <span class="k">return</span> max(since, seen)            <span class="c"># the later of the two</span>
+    <span class="k">return</span> since</pre>
+  <p>By default: the start of the previous working day. If you pressed <strong>Held</strong> after your last standup, it starts from that moment instead, so nothing appears twice. The moment is stored in <code class="inline">work_settings</code>, the per-person JSON blob.</p>
+
+  <h2>Isolating a failing source</h2>
+  <pre class="code">warnings: list[str] = []
+<span class="k">if</span> sources[<span class="s">"work_items"</span>] <span class="k">is not</span> None:
+    <span class="k">try</span>:
+        parts = sources[<span class="s">"work_items"</span>].standup_entries(user_id, start)
+        done += parts[<span class="s">"done"</span>]; today += parts[<span class="s">"today"</span>]; blockers += parts[<span class="s">"blockers"</span>]
+        warnings += parts[<span class="s">"warnings"</span>]
+    <span class="k">except</span> SourceUnavailableError <span class="k">as</span> exc:
+        warnings.append(f<span class="s">"Work items and pull requests are left out: {exc}"</span>)
+    <span class="k">except</span> Exception <span class="k">as</span> exc:
+        warnings.append(<span class="s">"Work items and pull requests are left out: "</span>
+                        f<span class="s">"Azure DevOps did not answer: {exc}"</span>)</pre>
+  <p>Two habits worth copying. A source the person does not have is <code class="inline">None</code> and is <em>silently</em> skipped (they never had it). A source that is there but fails produces a <em>visible</em> warning, so the person knows the report is incomplete. Silent partial results are worse than errors; labelled partial results are better than errors.</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li><code class="inline">to_text()</code> renders the three lists as Markdown, with "- Nothing." for an empty list. The <code class="inline">standup</code> tool returns exactly that text, and the agent is told never to add items the standup does not list (a guard against invented work).</li>
+      <li>The panel's "take it to the chat" asks for three short spoken lines: the model rewrites a report it was given; it does not gather facts.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>It is Monday 09:30 and you never pressed Held. From when does the standup start?</summary><p>Friday 00:00 in your zone: the previous working day.</p></details>
+  <details class="qa"><summary>Azure DevOps times out. What does the person see?</summary><p>The task-based lines, plus a warning "Work items and pull requests are left out: Azure DevOps did not answer: …". The request still succeeds.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P7)</span>
+    <p>Add a <strong>study recap</strong> to Ciao Tutor: <code class="inline">GET /api/recap?since=</code> with Done (tasks done since, lessons completed), Today (open tasks for today, vocab due today from <code class="inline">get_due_vocab</code>) and Blockers (failed runs). Default <code class="inline">since</code> = the start of yesterday, or the last time the learner pressed "Done with recap". Return JSON plus Markdown, and add a <code class="inline">recap</code> tool so "what did I study since Friday?" works in the tutor chat. Success: with the vocab table renamed (to simulate a failure), the recap still answers with a warning.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Read ../aac-pr-974/src/work/standup.py. Explain the difference between a source
+that is None and a source that raises, and why each is treated differently.
+Then review my Ciao Tutor recap for the same distinction.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 12 HOOK ===== -->
+<section class="sec" id="hook" data-title="The Claude Code hook">
+  <p class="eyebrow">Section 12 · Outside systems</p>
+  <h1><span class="sec-num">/ 12</span>The Claude Code hook: your laptop reports in</h1>
+  <p class="lede">The other adapters pull data from somewhere. This one is pushed: a small script on your laptop tells the server about each Claude Code session. It is a lesson in writing code that runs inside someone else's tool.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li>A Claude Code <strong>hook</strong> is a command Claude Code runs on an event. This one runs on <code class="inline">Stop</code> (after each answer) and <code class="inline">SessionEnd</code>.</li>
+      <li>It reads the session transcript, builds a title, summary, branch, commits, PR links and <code class="inline">AB#</code> items, and <code class="inline">PUT</code>s them to <code class="inline">/api/work/claude-sessions/&lt;session id&gt;</code>.</li>
+      <li><code class="inline">PUT</code> + the session id = an <strong>upsert</strong>: the same session can be reported 50 times and stays one task.</li>
+      <li>The hook must <strong>never get in the way</strong>: prints nothing, swallows every error, always exits 0, gives up fast if the server is not there.</li>
+    </ul>
+  </div>
+
+  <h2>Planned Claude Code tasks vs filed sessions</h2>
+  <p>Two different things share the kind <code class="inline">claude</code>, and this is what was unclear when you tried to schedule work on your ticket:</p>
+  <div class="cards">
+    <div class="card"><span class="tag">You plan it</span><h3>A Claude Code task you create</h3><p>Title + notes are the prompt. The card copies <code class="inline">claude "&lt;title&gt;\n\n&lt;notes&gt;"</code>; you paste it in a terminal at the right time. The server never runs it. You tick it done.</p></div>
+    <div class="card"><span class="tag">The hook files it</span><h3>A session that happened</h3><p>Created by the hook with <code class="inline">external_id = "claude:&lt;session id&gt;"</code>. Open while the session runs, done at <code class="inline">SessionEnd</code>. Notes hold the summary, branch, commits and PRs. The standup lists it.</p></div>
+  </div>
+  <p>The hook does not link a session to the task you planned; they are separate rows. Linking them (say, by putting the planned task id in the prompt) is a nice extension.</p>
+
+  <h2>The upsert, and "the person's word wins"</h2>
+  <pre class="code"><span class="c"># src/work/adapters/claude_code.py, upsert_session (trimmed)</span>
+external_id = f<span class="s">"claude:{sid}"</span>
+row = session.execute(select(WorkTaskModel).where(
+    WorkTaskModel.user_id == user_id, WorkTaskModel.external_id == external_id
+)).scalar_one_or_none()
+<span class="k">if</span> row <span class="k">is</span> None:
+    row = WorkTaskModel(id=..., assignee=store.CLAUDE, external_id=external_id,
+                        created_by=store.CLAUDE, created_via=store.CLAUDE, ...)
+    session.add(row)
+<span class="k">else</span>:
+    <span class="c"># Once filed, the person's word wins: a title they changed stays,</span>
+    <span class="c"># and a session they ticked done is not reopened by the next report.</span>
+    values.pop(<span class="s">"title"</span>)
+    <span class="k">if</span> row.status == <span class="s">"done"</span>:
+        values.pop(<span class="s">"status"</span>)
+        values.pop(<span class="s">"done_at"</span>)</pre>
+  <p>When a machine and a person both write the same row, decide who wins for each field. Here the machine owns the notes, time and length (it knows them best); the person owns the title and "done".</p>
+
+  <h2>Writing a hook that never hurts</h2>
+  <ul>
+    <li><strong>Standard library only</strong> (<code class="inline">json</code>, <code class="inline">urllib.request</code>, <code class="inline">subprocess</code> for git). It runs with whatever Python you point it at; no virtualenv to activate.</li>
+    <li><strong>Fast probe first:</strong> 1 second to see if anything listens at <code class="inline">WORK_API</code> (default <code class="inline">http://127.0.0.1:8000</code>); 5 seconds for a real request. <code class="inline">127.0.0.1</code>, not <code class="inline">localhost</code>, because on Windows a refused <code class="inline">localhost</code> connection tries twice (IPv6, then IPv4).</li>
+    <li><strong>Silent and always exit 0.</strong> A hook that prints or fails can disturb your Claude Code session. The cost: when it does not work, nothing tells you. The doc warns that a bare <code class="inline">python</code> on Windows can be the Microsoft Store stub, which does nothing.</li>
+    <li><strong>Strip injected text:</strong> transcript user messages also contain system reminders and notifications; the hook removes <code class="inline">&lt;system-reminder&gt;</code> blocks and skips non-prompts to find your real first prompt as the title.</li>
+  </ul>
+
+  <div class="box warn">
+    <span class="label">Try it on your laptop</span>
+    <p>Install it in <code class="inline">~/.claude/settings.json</code> as shown in <code class="inline">docs/work.md</code> (full path to a real Python 3.11+). While you test the worktree on port 8100, set <code class="inline">WORK_API=http://127.0.0.1:8100</code> in the hook's environment, or it reports to 8000. Then run a short Claude Code session and refresh My work.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>The hook reports session S after every answer: 12 times. How many tasks exist for S?</summary><p>One. Each report finds the row by <code class="inline">(user_id, external_id)</code> and updates it; the unique index guarantees it.</p></details>
+  <details class="qa"><summary>You renamed the session's task to "Fix AB#1349". The hook reports again with a new first prompt. Which title shows?</summary><p>Yours. After the first report the hook's title is dropped from the update.</p></details>
+  <details class="qa"><summary>Why does a hook exit 0 even when the request failed?</summary><p>A non-zero exit or output can be shown to you or affect the session. Logging work is a nice-to-have; it must never interrupt the work itself.</p></details>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Walk me through ../aac-pr-974/scripts/work/claude_session_log.py from stdin to
+the PUT request. For each function, one sentence on what it does and one on how
+it fails safely. Then help me install it for my laptop with WORK_API pointing at
+port 8100, and tell me how to check it worked without any output from the hook.</pre>
+  </div>
+</section>
+<!-- ===================================================== 13 PAGE ===== -->
+<section class="sec" id="page" data-title="The page">
+  <p class="eyebrow">Section 13 · The front end</p>
+  <h1><span class="sec-num">/ 13</span>The page: a calendar that feels instant</h1>
+  <p class="lede">The real page is React and TypeScript, about 2,500 lines. You do not need React to understand it. Five ideas carry it: load what is on screen, show changes before the server confirms, keep checking for work done elsewhere, drag and drop, and hide what the person cannot use.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li><strong>One call</strong> loads the visible range: <code class="inline">GET /api/work/tasks?start=&amp;end=</code>.</li>
+      <li><strong>Optimistic updates:</strong> change the screen first, send the PATCH, replace with the server's answer; on error, show a toast and reload.</li>
+      <li><strong>Refresh</strong> after every chat answer, on window focus, every 60 s, and every 10 s while a task on screen is running.</li>
+      <li><strong>Moving</strong> uses the browser's drag and drop; <strong>resizing</strong> and <strong>drawing a new task</strong> use pointer events.</li>
+    </ul>
+  </div>
+
+  <h2>The components</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>File</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td class="k">WorkPage.tsx</td><td>The header and two tabs. The Routines tab is loaded lazily, so its canvas library downloads only when opened</td></tr>
+      <tr><td class="k">Calendar.tsx</td><td>All views, the side panel, loading, optimistic changes, drag and drop</td></tr>
+      <tr><td class="k">TaskEditor.tsx</td><td>The card: who does it, title, date, time, repeat, notes; "Start now"; the Claude Code command</td></tr>
+      <tr><td class="k">AdoPanel.tsx, StandupPanel.tsx, MeetingCard.tsx, MiniMonth.tsx</td><td>The side sections and panels</td></tr>
+      <tr><td class="k">api.ts</td><td>One small function per route, so components never build URLs</td></tr>
+      <tr><td class="k">dates.ts, order.ts, layout.ts</td><td>Pure functions with tests: dates, list order, overlapping tasks</td></tr>
+    </tbody>
+  </table></div>
+  <p>Notice the split: the files with logic that is easy to get wrong (dates, order, layout) are <strong>pure functions</strong> with no React in them, so they can be unit-tested. Components wire them to the screen.</p>
+
+  <h2>Optimistic updates</h2>
+  <pre class="code"><span class="c">// Calendar.tsx</span>
+<span class="k">const</span> patch = <span class="k">async</span> (id: string, p: TaskInput) => {
+  <span class="k">const</span> before = byId(id);
+  <span class="k">if</span> (before) {
+    <span class="k">const</span> optimistic: Task = { ...before, ...(p <span class="k">as</span> Partial&lt;Task&gt;) };
+    <span class="k">if</span> (p.done !== undefined) optimistic.status = p.done ? <span class="s">'done'</span> : isMine(before) ? <span class="s">'open'</span> : <span class="s">'scheduled'</span>;
+    replace(optimistic);                 <span class="c">// 1. show it now</span>
+  }
+  <span class="k">try</span> {
+    replace(<span class="k">await</span> updateTask(id, p));   <span class="c">// 2. the server's version wins</span>
+  } <span class="k">catch</span> (e) {
+    showToast({ text: (e <span class="k">as</span> Error).message, tone: <span class="s">'danger'</span> });
+    <span class="k">void</span> load();                         <span class="c">// 3. on error, reload the truth</span>
+  }
+};</pre>
+  <p>Dragging a task to Thursday moves it immediately; a round trip to the server takes 100–300 ms, which feels sluggish if the task snaps back and then jumps. The server's answer then replaces the guess, which matters because the server may change more than the page did (a new <code class="inline">status</code>, <code class="inline">run_at</code>, <code class="inline">position</code>). If the server refuses, its <code class="inline">detail</code> message (the <code class="inline">WorkError</code> text from section 03) becomes the toast.</p>
+  <p>Note the small mirror of the server's status rule in step 1, so the checkbox looks right before the answer arrives. It is only a guess; the server's version replaces it.</p>
+
+  <h2>Delete with undo</h2>
+  <p>Delete removes the task at once and shows "Deleted · Undo" for six seconds. Undo does not "un-delete" anything: it <strong>creates a new task</strong> with everything the old one had. That keeps the server simple (a real delete, no trash table) and is a common pattern when undo is rare.</p>
+
+  <h2>Seeing work done elsewhere</h2>
+  <pre class="code"><span class="c">// Calendar.tsx: agents finish tasks in the background: look again now and then</span>
+useEffect(() => {
+  <span class="k">const</span> running = tasks.some((t) => t.status === <span class="s">'running'</span>);
+  <span class="k">const</span> id = window.setInterval(() => { <span class="k">void</span> load(); }, running ? 10_000 : 60_000);
+  <span class="k">const</span> onFocus = () => <span class="k">void</span> load();
+  window.addEventListener(<span class="s">'focus'</span>, onFocus);
+  <span class="k">return</span> () => { window.clearInterval(id); window.removeEventListener(<span class="s">'focus'</span>, onFocus); };
+}, [load, tasks]);</pre>
+  <p>Three other actors change your tasks: the runner, agents in a chat, and the Claude Code hook. The page uses <strong>polling</strong> (asking again on a timer) rather than a push channel. Polling faster while something is running and slower otherwise is a cheap, robust middle ground. The <code class="inline">return</code> function is React's cleanup: it removes the timer and listener when the component goes away, so they do not pile up.</p>
+
+  <h2>Drag and drop: two techniques</h2>
+  <div class="cards">
+    <div class="card"><span class="tag">HTML5 drag and drop</span><h3>Moving a task</h3><p><code class="inline">draggable</code>, <code class="inline">dragstart</code>, <code class="inline">dragover</code> (call <code class="inline">preventDefault()</code> to allow a drop), <code class="inline">drop</code>. Good for "pick this up, put it there", even between the side panel and the calendar. Azure DevOps items use it too, as a copy.</p></div>
+    <div class="card"><span class="tag">Pointer events</span><h3>Resizing, drawing a new task</h3><p><code class="inline">pointerdown</code> → listen to <code class="inline">pointermove</code> → <code class="inline">pointerup</code>. Needed when you want continuous feedback (the edge follows the mouse in 15-minute steps).</p></div>
+  </div>
+  <p>Pixels become minutes: an hour is 48 px tall, so <code class="inline">minutes = (y - top) / 48 * 60</code>, then <code class="inline">snap(minutes, 15)</code> rounds to a quarter hour.</p>
+
+  <h2>Your own order: fractional positions</h2>
+  <pre class="code"><span class="c">// order.ts: the position between the neighbours where a task is dropped</span>
+<span class="k">if</span> (prev &amp;&amp; next) <span class="k">return</span> ((prev.position ?? 0) + (next.position ?? 0)) / 2;
+<span class="k">if</span> (prev) <span class="k">return</span> (prev.position ?? 0) + 1;
+<span class="k">return</span> (next?.position ?? 0) - 1;</pre>
+  <p>Drop a task between positions 2 and 3 and it gets 2.5. Only the moved task is updated: one PATCH, not a renumbering of the whole list. This is called <strong>fractional indexing</strong>. (With floats you can halve about 50 times between the same two neighbours before precision runs out; for a person's to-do list that is plenty.)</p>
+
+  <h2>Overlapping tasks side by side</h2>
+  <p><code class="inline">layout.ts</code> sorts the day's timed tasks by start, gives each the first column that is free at its start, and groups tasks that overlap so every member of a group gets the same width. It is the classic <strong>interval partitioning</strong> greedy algorithm, in 35 lines, with no React.</p>
+
+  <h2>Hide what is not yours</h2>
+  <p>On load, the page calls <code class="inline">GET /api/work/capabilities</code> once: <code class="inline">{computer, meetings, work_items, claude}</code>. Each false hides a button or section. Remember: hiding is for clarity; the server still refuses (section 03).</p>
+
+  <div class="box app">
+    <span class="label">In the real code</span>
+    <ul>
+      <li>View, filters, side panel and tab are remembered in <code class="inline">localStorage</code>, always inside <code class="inline">try/catch</code> (private windows throw).</li>
+      <li>The card saves most fields as soon as they change, but the title and notes only when the card closes, so you do not send a PATCH per key press.</li>
+      <li>Every screen follows <code class="inline">docs/ui_principles.md</code>: no explanation text on the page, icons with tooltips, no dead ends. Read it before you change any UI in the real app.</li>
+    </ul>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Common mistakes</span>
+    <ul>
+      <li><strong>Optimistic without rollback.</strong> If the server refuses and the screen keeps the change, the page lies until the next reload.</li>
+      <li><strong>Intervals without cleanup.</strong> Each re-render adds a timer; after a minute you poll ten times a second.</li>
+      <li><strong>Inserting model or user text with <code class="inline">innerHTML</code>.</strong> A task title like <code class="inline">&lt;img onerror=…&gt;</code> runs code. Use <code class="inline">textContent</code> (React escapes for you).</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>You tick a Monitor task done and the server answers 400 "This task is running now…". What does the person see?</summary><p>The checkbox flips immediately (optimistic), then a red toast with the server's message, and the reload puts the task back as running.</p></details>
+  <details class="qa"><summary>Why poll every 10 seconds only while something is running?</summary><p>That is when an outcome is about to change. The rest of the time a minute is fresh enough, and slower polling costs the server less.</p></details>
+  <details class="qa"><summary>Positions are 1, 2, 3. You drop a task between 1 and 2, then another between 1 and the new one. Their positions?</summary><p>1.5, then 1.25.</p></details>
+
+  <div class="box app">
+    <span class="label">Exercise (P6)</span>
+    <p>Add a "Planner" view to Ciao Tutor's plain-JS page (no React, no build step, as in M4a of mini-agents): seven day columns for this week plus a "No date" column; each task a card with a checkbox; a small form to add one; tasks for the tutor show their status and, when done, a link to the saved chat. Implement the optimistic <code class="inline">patch</code> with rollback and a 10 s / 60 s poll with cleanup. Stretch: HTML5 drag and drop between columns with a midpoint <code class="inline">position</code>. Success: ticking a task feels instant; with the API stopped, ticking shows an error and the checkbox reverts.</p>
+  </div>
+
+  <div class="prompt">
+    <span class="plabel">Ask Claude Code</span>
+    <button class="copy" type="button">Copy</button>
+<pre>I'm new to front-end code. Explain ../aac-pr-974/chatkit/app/src/work/Calendar.tsx
+lines 200-245 (replace, patch, create, remove) as if translating to plain
+JavaScript with fetch and DOM updates. Then review my planner page in Ciao
+Tutor for: optimistic update + rollback, timers cleaned up, textContent instead
+of innerHTML. Don't rewrite it; list issues with line numbers.</pre>
+  </div>
+</section>
+
+<!-- ===================================================== 14 BUILD ===== -->
+<section class="sec" id="build" data-title="Build plan">
+  <p class="eyebrow">Section 14 · Build it</p>
+  <h1><span class="sec-num">/ 14</span>Build plan: a practice planner for Ciao Tutor</h1>
+  <p class="lede">Everything in this guide, applied to the Ciao Tutor app from your main study guide. The learner plans their Italian practice; some tasks they do themselves, some they hand to the tutor, and the server does those on time. Nine milestones, each small enough for one session.</p>
+
+  <div class="tldr">
+    <span class="label">TL;DR</span>
+    <ul>
+      <li><strong>Prerequisites:</strong> Ciao Tutor M0 (setup), M2 (tutor chat with tools, vocab in SQLite, <code class="inline">user_id</code> from the session) and M3 (<code class="inline">make_lesson()</code>). Your main guide's section 12 is the short version of this plan.</li>
+      <li><strong>Three assignees:</strong> <code class="inline">me</code> (the learner), <code class="inline">tutor</code> (one tutor-chat turn, like an agent slug), <code class="inline">lesson</code> (the daily-lesson flow, like a routine).</li>
+      <li><strong>No new dependencies:</strong> stdlib <code class="inline">sqlite3</code>, <code class="inline">asyncio</code>, <code class="inline">zoneinfo</code>; FastAPI and Pydantic you already have.</li>
+    </ul>
+  </div>
+
+  <h2>How the real feature maps to Ciao Tutor</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>My work</th><th>Practice planner</th></tr></thead>
+    <tbody>
+      <tr><td class="k">work_tasks</td><td><code class="inline">study_tasks</code>, in the same SQLite file as vocab</td></tr>
+      <tr><td class="k">assignee me / agent slug / routine</td><td>me / <code class="inline">tutor</code> / <code class="inline">lesson</code></td></tr>
+      <tr><td class="k">A chat that turns unread</td><td>A saved conversation (or lesson) the planner links to</td></tr>
+      <tr><td class="k">add_task, list_my_tasks tools on every agent</td><td>The same two tools on the tutor chat agent</td></tr>
+      <tr><td class="k">Standup</td><td>Study recap: done tasks, lessons, vocab due today</td></tr>
+      <tr><td class="k">Azure DevOps / meetings adapters</td><td>Optional: a class calendar behind a <code class="inline">CalendarSource</code> port</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>P0 · The table <span class="pill">section 02</span></h3>
+  <p><strong>Build:</strong> <code class="inline">planner/db.py</code>, <code class="inline">study_tasks</code> with the columns from section 02 (no Azure DevOps or campaign columns) and the two indexes. <strong>Verify:</strong> runs twice without error; <code class="inline">.schema</code> shows both indexes.</p>
+
+  <h3>P1 · The store <span class="pill">sections 03, 04</span></h3>
+  <p><strong>Build:</strong> <code class="inline">planner/store.py</code>: <code class="inline">WorkError</code>, validators, <code class="inline">create/update/list/delete</code>, the status rule, <code class="inline">_run_at</code>, every query filtered by <code class="inline">user_id</code>. <strong>Verify:</strong> pytest for the validators, the four status cases, the two DST cases, and "another learner's task is not found".</p>
+  <div class="prompt">
+    <span class="plabel">Claude Code brief · P1 (plan mode first)</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Goal: planner/store.py for Ciao Tutor's practice planner, modelled on
+../aac-pr-974/src/work/store.py but much smaller.
+Constraints: stdlib sqlite3 only; assignees "me", "tutor", "lesson"; status is
+derived, never accepted from callers; every query filters on user_id;
+WorkError messages say what is wrong and the accepted form.
+Acceptance criteria:
+- tests: empty title, "9:5", time without date, repeat without date all refused
+- "9:05" stored as "09:05"
+- my task: done=True → done, done=False → open
+- tutor task: failed + moved → scheduled; done + reassigned to me → open, run_at None
+- 09:00 Europe/Amsterdam on 2026-07-01 → run_at 07:00 UTC; 2026-12-01 → 08:00 UTC
+I write the code; you review my plan first, then my code.</pre>
+  </div>
+
+  <h3>P2 · The API <span class="pill">section 05</span></h3>
+  <p><strong>Build:</strong> <code class="inline">GET/POST /api/tasks</code>, <code class="inline">PATCH/DELETE /api/tasks/{id}</code>, <code class="inline">POST /api/tasks/{id}/run</code> (202). <strong>Verify:</strong> missing-vs-null with curl; 404 for another learner's id; 409 for "run" on your own task.</p>
+
+  <h3>P3 · The runner <span class="pill">sections 06, 07</span></h3>
+  <p><strong>Build:</strong> lifespan-started loop, conditional-UPDATE claim, cap of 2, stale rule, <code class="inline">run_task</code> that runs one tutor turn or <code class="inline">make_lesson()</code> as the learner and saves the outcome. <strong>Verify:</strong> a due tutor task runs within one interval; double claim test; a forced exception ends <code class="inline">failed</code>; Ctrl+C during a run leaves it <code class="inline">failed</code> ("the server stopped"), not <code class="inline">running</code>.</p>
+  <div class="prompt">
+    <span class="plabel">Claude Code brief · P3 (plan mode first)</span>
+    <button class="copy" type="button">Copy</button>
+<pre>Goal: run the planner's tutor and lesson tasks on time, in the background.
+Constraints: asyncio loop started in the FastAPI lifespan; claim with one
+conditional UPDATE (rowcount == 1); keep references to created tasks; at most 2
+runs at once; run as the task's user_id; sync sqlite calls via asyncio.to_thread;
+no Celery, no APScheduler.
+Acceptance criteria:
+- a tutor task dated in the past runs at the next pass; result + saved chat id stored
+- calling claim_due twice for one due task returns it once
+- an exception in the turn → failed with the message; the loop keeps running
+- cancelling the loop mid-run → the task ends failed, not running
+- a task running for over an hour is failed by the next pass
+Show me your plan; I'll write the code and you'll review it.</pre>
+  </div>
+
+  <h3>P4 · Tools on the tutor <span class="pill">section 08</span></h3>
+  <p><strong>Build:</strong> <code class="inline">list_my_tasks</code> (starts with today's date) and <code class="inline">add_task</code>, identity from the session, <code class="inline">"Not added: …"</code> on errors, the ContextVar loop guard. <strong>Verify:</strong> "remind me to review verbs Friday at 18:00" adds the right task and says the date; the guard test.</p>
+
+  <h3>P5 · Repeating <span class="pill">section 09</span></h3>
+  <p><strong>Build:</strong> <code class="inline">repeat</code>, <code class="inline">series_id</code>, <code class="inline">next_occurrence</code>, <code class="inline">_add_next</code> on tick and on finish. Schedule a <code class="inline">lesson</code> task weekdays at 08:00. <strong>Verify:</strong> the eight edge-case tests from section 09; a lesson appears by itself the next weekday morning.</p>
+
+  <h3>P6 · The page <span class="pill">section 13</span></h3>
+  <p><strong>Build:</strong> a plain-JS week view with a "No date" column, add form, checkbox, status and chat links, optimistic updates with rollback, polling with cleanup. <strong>Verify:</strong> instant ticks; error toast and revert with the API stopped; a task added from the tutor chat appears without a manual reload.</p>
+
+  <h3>P7 · Study recap <span class="pill">section 11</span></h3>
+  <p><strong>Build:</strong> <code class="inline">GET /api/recap</code> and a <code class="inline">recap</code> tool. <strong>Verify:</strong> a failing part becomes a warning, not an error.</p>
+
+  <h3>P8 · Optional: a class calendar behind a port <span class="pill">section 10</span></h3>
+  <p><strong>Build:</strong> <code class="inline">CalendarSource</code> Protocol, a fake and an <code class="inline">.ics</code> adapter, config choosing one. <strong>Verify:</strong> no file outside the adapter knows about <code class="inline">.ics</code>.</p>
+
+  <div class="box idea">
+    <span class="label">The one idea</span>
+    <p>At P3 your tutor stops being something that answers when asked and becomes something that <em>works for the learner while they are away</em>. That shift brings every hard question in this guide: as whom does it run, what if it fails, what if it runs twice, how does the learner find out. Answer them in your acceptance criteria before you write the code.</p>
+  </div>
+</section>
+
+<!-- ===================================================== 15 REFERENCE ===== -->
+<section class="sec" id="reference" data-title="Reference">
+  <p class="eyebrow">Section 15 · Reference</p>
+  <h1><span class="sec-num">/ 15</span>Reference: file map, glossary, what to learn next</h1>
+  <p class="lede">Keep this page open while you read the real code.</p>
+
+  <h2>File map (worktree <code class="inline">aac-pr-974</code>)</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>File</th><th>Read it for</th></tr></thead>
+    <tbody>
+      <tr><td class="k">docs/work.md</td><td>The full spec: every rule, route, tool and limit. The source for this guide</td></tr>
+      <tr><td class="k">src/work/__init__.py</td><td>Package overview; the <code class="inline">running_task</code> ContextVar</td></tr>
+      <tr><td class="k">src/work/store.py</td><td>Validation, status, repeats, claims, standup queries</td></tr>
+      <tr><td class="k">src/work/runner.py</td><td>The loop, prompts, agent / routine / Computer runs</td></tr>
+      <tr><td class="k">src/work/ports.py, integrations.py</td><td>Interfaces, errors, who gets which system</td></tr>
+      <tr><td class="k">src/work/adapters/ado.py</td><td>Azure DevOps: view, WIQL, ownership, comments, standup items</td></tr>
+      <tr><td class="k">src/work/adapters/devrev_meetings.py</td><td>Meetings and the de-duplication heuristic</td></tr>
+      <tr><td class="k">src/work/adapters/claude_code.py</td><td>Session upsert</td></tr>
+      <tr><td class="k">src/work/standup.py</td><td>Report building, warnings, Markdown</td></tr>
+      <tr><td class="k">src/api/work.py, work_ado.py</td><td>Routes</td></tr>
+      <tr><td class="k">src/api/postgres_store.py</td><td><code class="inline">WorkTaskModel</code>, <code class="inline">WorkSettingsModel</code>, the ADD COLUMN migrations</td></tr>
+      <tr><td class="k">src/agent/tools_work.py, tools_work_ado.py</td><td>The agents' tools</td></tr>
+      <tr><td class="k">scripts/work/claude_session_log.py</td><td>The hook</td></tr>
+      <tr><td class="k">chatkit/app/src/work/</td><td>The page</td></tr>
+      <tr><td class="k">tests/test_work.py, test_work_ado.py, test_work_claude.py</td><td>How each rule is tested (on SQLite, with a stand-in agent)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Glossary</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Term</th><th>Meaning here</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Single source of truth</td><td>One module owns a rule; every path calls it (<code class="inline">store.py</code>)</td></tr>
+      <tr><td class="k">Derived state</td><td>A value computed from others, never set directly (<code class="inline">kind</code>, <code class="inline">status</code>, <code class="inline">run_at</code>)</td></tr>
+      <tr><td class="k">Soft delete</td><td>Hide instead of delete (<code class="inline">archived_at</code>)</td></tr>
+      <tr><td class="k">Wall-clock time vs instant</td><td>"Thursday 09:00 in Amsterdam" vs one point in UTC</td></tr>
+      <tr><td class="k">Partial update</td><td>PATCH changes only the fields sent (<code class="inline">exclude_unset</code>)</td></tr>
+      <tr><td class="k">Lifespan</td><td>FastAPI's start-up/shutdown hook; starts and stops the runner</td></tr>
+      <tr><td class="k">Conditional update / compare-and-set</td><td>An UPDATE whose WHERE includes the expected state; rowcount says who won</td></tr>
+      <tr><td class="k">Optimistic concurrency</td><td>No locks; make the write conditional and handle losing</td></tr>
+      <tr><td class="k">Stale run</td><td>A run whose process died; ended by a time rule</td></tr>
+      <tr><td class="k">TOCTOU</td><td>Time-of-check vs time-of-use: re-check permissions when the work runs</td></tr>
+      <tr><td class="k">ContextVar</td><td>A per-asyncio-task variable; the loop guard</td></tr>
+      <tr><td class="k">Idempotent</td><td>Doing it twice = doing it once (<code class="inline">_add_next</code>, the hook's PUT)</td></tr>
+      <tr><td class="k">Upsert</td><td>Insert or update by a natural key (<code class="inline">external_id</code>)</td></tr>
+      <tr><td class="k">Ports and adapters</td><td>Core depends on interfaces; edge code implements them per system</td></tr>
+      <tr><td class="k">Fail closed</td><td>When unsure (bad config), grant nothing</td></tr>
+      <tr><td class="k">Graceful degradation</td><td>Part of the answer fails; the rest is shown with a warning</td></tr>
+      <tr><td class="k">Optimistic UI</td><td>Show the change before the server confirms; roll back on error</td></tr>
+      <tr><td class="k">Fractional indexing</td><td>Order by a number; insert at the midpoint</td></tr>
+      <tr><td class="k">Polling</td><td>Ask again on a timer instead of being pushed updates</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>What to learn next</h2>
+  <h3>Important next</h3>
+  <ol class="steps">
+    <li><strong>Database transactions and isolation levels</strong> (search: "PostgreSQL transaction isolation read committed"). Section 06's claim works because of how one UPDATE is isolated; knowing why makes you safe with any shared state.</li>
+    <li><strong>Idempotency and at-least-once execution</strong> (search: "idempotency key", "at-least-once vs exactly-once"). The same idea governs retries in data pipelines, APIs and job runners.</li>
+    <li><strong>asyncio properly</strong>: event loop, tasks, cancellation, <code class="inline">to_thread</code>. The Python docs' "Coroutines and Tasks" page, then "Developing with asyncio".</li>
+    <li><strong>Hexagonal architecture</strong> (Alistair Cockburn's original article, "Hexagonal architecture"). A short read that will change how you structure every integration.</li>
+  </ol>
+  <h3>Interesting but optional</h3>
+  <ul>
+    <li>iCalendar RRULE (RFC 5545) and <code class="inline">dateutil.rrule</code>, to compare with the "materialise next" approach.</li>
+    <li>Fractional indexing with strings (Figma's and Evan Wallace's write-ups) for orders that never run out of precision.</li>
+    <li>Job queues (Celery, RQ, Postgres <code class="inline">SELECT … FOR UPDATE SKIP LOCKED</code>) to see what the next step up from a polling loop looks like.</li>
+    <li>Server-sent events or WebSockets instead of polling, which your mini-agents chat already uses for streaming.</li>
+  </ul>
+
+  <div class="box idea">
+    <span class="label">The one idea, again</span>
+    <p>Put each rule in one place, run work as the person it belongs to, make every write safe to repeat, and let outside systems fail without taking your feature down with them. That is most of backend engineering, and you have now seen all of it in one feature.</p>
+  </div>
+</section>
+
+  </div><!-- /inner -->
+  </main>
+  <div class="scrim" id="scrim"></div>
+</div>
+
+<script>
+(function () {
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section.sec'));
+  var ids = sections.map(function (s) { return s.id; });
+  var tocItems = Array.prototype.slice.call(document.querySelectorAll('#toc li[data-sec]'));
+  var side = document.getElementById('side');
+  var scrim = document.getElementById('scrim');
+  var menuBtn = document.getElementById('menuBtn');
+  var themeBtn = document.getElementById('themeBtn');
+  var progressBar = document.getElementById('progressBar');
+  var progressLabel = document.getElementById('progressLabel');
+  var DONE_KEY = 'mywork-guide-done';
+  var THEME_KEY = 'agents-guide-theme';
+
+  function loadDone() {
+    try { return JSON.parse(localStorage.getItem(DONE_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveDone(list) {
+    try { localStorage.setItem(DONE_KEY, JSON.stringify(list)); } catch (e) { /* storage unavailable */ }
+  }
+  var done = loadDone();
+
+  function isDone(id) { return done.indexOf(id) !== -1; }
+  function setDone(id, flag) {
+    var i = done.indexOf(id);
+    if (flag && i === -1) done.push(id);
+    if (!flag && i !== -1) done.splice(i, 1);
+    saveDone(done);
+    renderDone();
+  }
+  function renderDone() {
+    tocItems.forEach(function (li) {
+      li.classList.toggle('done', isDone(li.getAttribute('data-sec')));
+    });
+    sections.forEach(function (s) {
+      var cb = s.querySelector('.done-toggle input');
+      if (cb) cb.checked = isDone(s.id);
+    });
+    var pct = ids.length ? Math.round(100 * done.filter(function (d) { return ids.indexOf(d) !== -1; }).length / ids.length) : 0;
+    progressBar.style.width = pct + '%';
+    progressLabel.textContent = done.filter(function (d) { return ids.indexOf(d) !== -1; }).length + ' / ' + ids.length + ' done';
+  }
+
+  // Build a footer (done toggle + prev/next) for every section
+  sections.forEach(function (s, i) {
+    var foot = document.createElement('div');
+    foot.className = 'sec-foot';
+    var label = document.createElement('label');
+    label.className = 'done-toggle';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.addEventListener('change', function () { setDone(s.id, cb.checked); });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' Mark section as done'));
+    foot.appendChild(label);
+    var spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    foot.appendChild(spacer);
+    if (i > 0) {
+      var prev = document.createElement('a');
+      prev.className = 'nav-btn';
+      prev.href = '#' + sections[i - 1].id;
+      prev.textContent = '← ' + sections[i - 1].getAttribute('data-title');
+      foot.appendChild(prev);
+    }
+    if (i < sections.length - 1) {
+      var next = document.createElement('a');
+      next.className = 'nav-btn primary';
+      next.href = '#' + sections[i + 1].id;
+      next.textContent = sections[i + 1].getAttribute('data-title') + ' →';
+      foot.appendChild(next);
+    }
+    s.appendChild(foot);
+  });
+
+  var activeId = ids[0];
+
+  function show(id, opts) {
+    if (ids.indexOf(id) === -1) id = ids[0];
+    activeId = id;
+    sections.forEach(function (s) { s.classList.toggle('active', s.id === id); });
+    tocItems.forEach(function (li) {
+      var a = li.querySelector('a');
+      var active = li.getAttribute('data-sec') === id;
+      a.classList.toggle('active', active);
+      if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    var title = document.getElementById(id).getAttribute('data-title') || id;
+    document.title = title + ' · My Work Study Guide';
+    if (!(opts && opts.keepScroll)) window.scrollTo(0, 0);
+    closeMenu();
+  }
+
+  function current() {
+    var h = (location.hash || '').replace('#', '');
+    return ids.indexOf(h) !== -1 ? h : ids[0];
+  }
+
+  // go(): update the URL when the environment allows it, then show the section.
+  // Some viewers (sandboxed previews, data: snapshots) block hash changes; the
+  // section still switches because show() does not depend on the URL.
+  function go(id) {
+    if (ids.indexOf(id) === -1) return;
+    try { history.pushState(null, '', '#' + id); } catch (err) { /* ignore */ }
+    show(id);
+  }
+
+  window.addEventListener('hashchange', function () { show(current()); });
+  window.addEventListener('popstate', function () { show(current()); });
+
+  // every in-page link (menu, prev/next, cross-references) goes through go()
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a) return;
+    var id = a.getAttribute('href').slice(1);
+    if (ids.indexOf(id) === -1) return;
+    e.preventDefault();
+    go(id);
+  });
+
+  // keyboard: arrows move between sections (not while typing)
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.altKey || e.ctrlKey || e.metaKey) return;
+    var i = ids.indexOf(activeId);
+    if (e.key === 'ArrowRight' && i < ids.length - 1) go(ids[i + 1]);
+    if (e.key === 'ArrowLeft' && i > 0) go(ids[i - 1]);
+  });
+
+  // mobile menu
+  function openMenu() { side.classList.add('open'); scrim.classList.add('show'); }
+  function closeMenu() { side.classList.remove('open'); scrim.classList.remove('show'); }
+  menuBtn.addEventListener('click', function () { side.classList.contains('open') ? closeMenu() : openMenu(); });
+  scrim.addEventListener('click', closeMenu);
+
+  // theme
+  function applyTheme(t) {
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  var storedTheme = null;
+  try { storedTheme = localStorage.getItem(THEME_KEY); } catch (e) {}
+  applyTheme(storedTheme);
+  themeBtn.addEventListener('click', function () {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = isDark ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  });
+
+  // copy buttons
+  Array.prototype.slice.call(document.querySelectorAll('.prompt .copy')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = btn.parentNode.querySelector('pre');
+      var text = pre ? pre.textContent : '';
+      function ok() { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1400); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok, function () { fallback(); });
+      } else { fallback(); }
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); ok(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+
+  renderDone();
+  show(current(), { keepScroll: true });
+})();
+</script>
+</body>
+</html>
