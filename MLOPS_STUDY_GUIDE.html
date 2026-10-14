@@ -1,0 +1,2186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLOps Study Guide</title>
+<meta name="description" content="A beginner's guide to the infrastructure behind an AI agent platform: virtual machines, Docker, Docker Compose, nginx, networks and firewalls, security, CI/CD pipelines, monitoring and infrastructure as code. Taught from the real setup of agents_and_connectors, with a plan to build your own.">
+<style>
+  :root {
+    --top-h: 60px;
+    --bg: #f7f9f9;
+    --panel: #ffffff;
+    --ink: #1c2528;
+    --ink-soft: #4d5c61;
+    --ink-faint: #7e8d92;
+    --line: #dde5e6;
+    --accent: #0e7570;
+    --accent-soft: #e2f0ef;
+    --amber: #a05a0a;
+    --amber-soft: #f6ecdd;
+    --rose: #a1343b;
+    --rose-soft: #f8e5e6;
+    --code-bg: #14201f;
+    --code-ink: #d4e4e2;
+    --code-accent: #7fd6c8;
+    --code-str: #e6c07b;
+    --code-com: #6d8583;
+    --done: #3d7a46;
+    --shadow: 0 1px 2px rgba(28,37,40,.05), 0 4px 14px rgba(28,37,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101819;
+      --panel: #172122;
+      --ink: #e3ecec;
+      --ink-soft: #a7b7b8;
+      --ink-faint: #6f8081;
+      --line: #263334;
+      --accent: #4cc3b6;
+      --accent-soft: #12302e;
+      --amber: #e0a45c;
+      --amber-soft: #33260f;
+      --rose: #e08a90;
+      --rose-soft: #3a1a1d;
+      --code-bg: #0b1414;
+      --code-ink: #cfe0de;
+      --code-accent: #6fcabd;
+      --code-str: #e6c07b;
+      --code-com: #6d8583;
+      --done: #7dbb86;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101819;
+    --panel: #172122;
+    --ink: #e3ecec;
+    --ink-soft: #a7b7b8;
+    --ink-faint: #6f8081;
+    --line: #263334;
+    --accent: #4cc3b6;
+    --accent-soft: #12302e;
+    --amber: #e0a45c;
+    --amber-soft: #33260f;
+    --rose: #e08a90;
+    --rose-soft: #3a1a1d;
+    --code-bg: #0b1414;
+    --code-ink: #cfe0de;
+    --code-accent: #6fcabd;
+    --code-str: #e6c07b;
+    --code-com: #6d8583;
+    --done: #7dbb86;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .mono, code, pre, kbd { font-family: "Cascadia Code", Consolas, "SF Mono", Menlo, monospace; }
+
+  /* ---------- layout ---------- */
+  .app:not(.box) {
+    display: grid;
+    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-rows: var(--top-h) 1fr;
+    min-height: 100vh;
+  }
+  header.top {
+    grid-column: 1 / -1;
+    position: sticky; top: 0; z-index: 20;
+    height: var(--top-h);
+    display: flex; align-items: center; gap: .9rem;
+    padding: 0 1.1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; flex: 1; }
+  .brand .eyebrow { margin: 0 0 .15rem; }
+  .brand strong { font-weight: 650; font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top-right { display: flex; align-items: center; gap: .7rem; flex-shrink: 0; }
+  .progress { width: 120px; height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
+  .progress .bar { height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+  .progress-label { font-family: "Cascadia Code", Consolas, monospace; font-size: .75rem; color: var(--ink-faint); white-space: nowrap; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    cursor: pointer; font-size: 1rem;
+  }
+  .icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+  .menu-btn { display: none; }
+
+  nav.side {
+    position: sticky; top: var(--top-h);
+    height: calc(100vh - var(--top-h));
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    padding: .9rem .7rem 2.5rem;
+  }
+  .toc { list-style: none; margin: 0; padding: 0; }
+  .toc li.group {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .68rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: .9rem .6rem .35rem;
+  }
+  .toc li.group:first-child { padding-top: .3rem; }
+  .toc a {
+    display: flex; gap: .6rem; align-items: baseline;
+    padding: .42rem .6rem; border-radius: 8px;
+    color: var(--ink-soft); text-decoration: none; font-size: .9rem; line-height: 1.3;
+  }
+  .toc a:hover { background: var(--bg); color: var(--ink); }
+  .toc a .n {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; color: var(--ink-faint); min-width: 1.5rem; flex-shrink: 0;
+  }
+  .toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .toc a.active .n { color: var(--accent); }
+  .toc li.done a .n { color: var(--done); }
+  .toc li.done a .n::after { content: " ✓"; }
+
+  main.content { padding: 2.1rem 2rem 5rem; min-width: 0; }
+  .inner { max-width: 820px; margin: 0 auto; }
+  section.sec { display: none; }
+  section.sec.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .scrim { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 25; }
+  .scrim.show { display: block; }
+
+  @media (max-width: 920px) {
+    .app:not(.box) { grid-template-columns: minmax(0, 1fr); }
+    nav.side {
+      position: fixed; left: 0; top: var(--top-h); bottom: 0; width: 290px; max-width: 86vw;
+      transform: translateX(-100%); transition: transform .2s ease; z-index: 30;
+      box-shadow: var(--shadow);
+    }
+    nav.side.open { transform: none; }
+    .menu-btn { display: inline-flex; }
+    main.content { padding: 1.5rem 16px 4rem; }
+    .progress { width: 70px; }
+    .brand .eyebrow { display: none; }
+  }
+  @media (max-width: 560px) {
+    .progress-label { display: none; }
+  }
+
+  /* ---------- typography ---------- */
+  .eyebrow {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .72rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .6rem;
+  }
+  h1 {
+    font-size: clamp(1.7rem, 3.6vw, 2.3rem);
+    line-height: 1.15; margin: 0 0 .6rem;
+    letter-spacing: -.02em; font-weight: 650; text-wrap: balance;
+  }
+  h1 .sec-num {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .78rem; color: var(--ink-faint); display: block;
+    letter-spacing: .12em; margin-bottom: .4rem; font-weight: 500;
+  }
+  .lede { color: var(--ink-soft); font-size: 1.06rem; max-width: 44rem; margin: 0 0 1.4rem; }
+  h2 { font-size: 1.3rem; letter-spacing: -.01em; margin: 2.4rem 0 .6rem; font-weight: 650; text-wrap: balance; }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 .4rem; font-weight: 650; }
+  p { max-width: 44rem; margin: .7rem 0; }
+  ul, ol { max-width: 44rem; padding-left: 1.3rem; }
+  li { margin: .3rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  strong { font-weight: 650; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+  kbd {
+    font-size: .8em; padding: .1em .45em; border-radius: 5px;
+    border: 1px solid var(--line); border-bottom-width: 2px; background: var(--bg); color: var(--ink);
+  }
+
+  /* ---------- boxes ---------- */
+  .tldr, .box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 1rem 1.3rem;
+    box-shadow: var(--shadow);
+    margin: 1.3rem 0;
+  }
+  .tldr .label, .box .label {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--accent); display: block; margin-bottom: .45rem;
+  }
+  .tldr ul { margin: 0; padding-left: 1.2rem; }
+  .tldr li { margin: .3rem 0; }
+  .box p:first-of-type { margin-top: 0; }
+  .box p:last-child, .box ul:last-child, .box ol:last-child, .box pre:last-child { margin-bottom: 0; }
+  .box.app { border-left-color: #2b7a3e; }
+  .box.app .label { color: #2b7a3e; }
+  :root[data-theme="dark"] .box.app, :root:not([data-theme="light"]) .box.app { border-left-color: #7dbb86; }
+  :root[data-theme="dark"] .box.app .label { color: #7dbb86; }
+  .box.warn { border-left-color: var(--amber); }
+  .box.warn .label { color: var(--amber); }
+  .box.idea { border-left-color: var(--rose); background: var(--panel); }
+  .box.idea .label { color: var(--rose); }
+  .box.idea p { font-size: 1.04rem; }
+
+  /* ---------- cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .8rem; margin: 1.2rem 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: .95rem 1.1rem;
+  }
+  .card h3 { margin: 0 0 .3rem; font-size: .98rem; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: .93rem; }
+  .card .tag {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); display: block; margin-bottom: .3rem;
+  }
+
+  /* ---------- tables ---------- */
+  .tw { overflow-x: auto; margin: 1.1rem 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  table.t { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  table.t th, table.t td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.t th {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600; background: var(--bg);
+  }
+  table.t tr:last-child td { border-bottom: 0; }
+  table.t td.k { font-weight: 600; white-space: nowrap; }
+
+  /* ---------- code ---------- */
+  pre.code {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 10px; padding: 1rem 1.2rem;
+    overflow-x: auto; font-size: .83rem; line-height: 1.6; margin: .9rem 0;
+    tab-size: 4;
+  }
+  pre.code .c { color: var(--code-com); font-style: italic; }
+  pre.code .k { color: var(--code-accent); }
+  pre.code .s { color: var(--code-str); }
+  code.inline {
+    font-size: .85em; background: var(--accent-soft); color: var(--accent);
+    padding: .1em .4em; border-radius: 5px;
+  }
+  .prompt {
+    position: relative; margin: 1rem 0;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    box-shadow: var(--shadow);
+  }
+  .prompt .plabel {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .68rem; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--amber); padding: .6rem 1rem 0;
+    display: block;
+  }
+  .prompt pre {
+    margin: 0; padding: .5rem 1rem .9rem; white-space: pre-wrap; word-break: break-word;
+    font-size: .84rem; line-height: 1.55; color: var(--ink);
+  }
+  .prompt .copy {
+    position: absolute; top: .45rem; right: .5rem;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: .72rem;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink-soft);
+    border-radius: 6px; padding: .2rem .55rem; cursor: pointer;
+  }
+  .prompt .copy:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- lists ---------- */
+  ol.steps { list-style: none; padding-left: 0; counter-reset: step; margin: 1rem 0; }
+  ol.steps > li {
+    counter-increment: step; position: relative; padding-left: 2.4rem; margin: .7rem 0;
+  }
+  ol.steps > li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute; left: 0; top: .15rem;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: .78rem; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: .05rem .4rem;
+  }
+  ul.check { list-style: none; padding-left: 0; }
+  ul.check li { display: flex; gap: .6rem; align-items: baseline; }
+  ul.check li::before { content: "☐"; color: var(--amber); flex-shrink: 0; }
+  .pill {
+    display: inline-block; font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .7rem; letter-spacing: .06em; padding: .12rem .5rem; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink-soft); vertical-align: middle;
+  }
+  .pill.code { color: var(--accent); border-color: var(--accent); }
+  .pill.model { color: var(--amber); border-color: var(--amber); }
+
+  /* ---------- quiz ---------- */
+  details.qa {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: .7rem 1rem; margin: .6rem 0;
+  }
+  details.qa summary { cursor: pointer; font-weight: 600; list-style: none; }
+  details.qa summary::-webkit-details-marker { display: none; }
+  details.qa summary::before { content: "▸ "; color: var(--accent); }
+  details[open].qa summary::before { content: "▾ "; }
+  details.qa p, details.qa ul { margin: .5rem 0 0; color: var(--ink-soft); }
+
+  /* ---------- diagrams ---------- */
+  .diagram {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: .8rem; margin: 1.1rem 0; overflow-x: auto; box-shadow: var(--shadow);
+  }
+  .diagram svg { display: block; width: 100%; height: auto; max-width: 780px; margin: 0 auto; font-family: "Segoe UI", system-ui, sans-serif; }
+  .diagram .cap { font-size: .84rem; color: var(--ink-faint); text-align: center; margin: .5rem 0 0; }
+  .d-box { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+  .d-box.hi { fill: var(--accent-soft); stroke: var(--accent); }
+  .d-box.warm { fill: var(--amber-soft); stroke: var(--amber); }
+  .d-text { fill: var(--ink); font-size: 13px; }
+  .d-text.sm { font-size: 11px; fill: var(--ink-soft); }
+  .d-text.mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; fill: var(--ink-soft); }
+  .d-line { stroke: var(--ink-soft); stroke-width: 1.4; fill: none; }
+  .d-line.hi { stroke: var(--accent); }
+  .d-line.warm { stroke: var(--amber); }
+  .d-arrow { fill: var(--ink-soft); }
+  .d-arrow.hi { fill: var(--accent); }
+  .d-arrow.warm { fill: var(--amber); }
+
+  /* ---------- section footer ---------- */
+  .sec-foot {
+    margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: .8rem; flex-wrap: wrap;
+  }
+  .sec-foot .done-toggle {
+    display: inline-flex; align-items: center; gap: .5rem; cursor: pointer;
+    font-size: .92rem; color: var(--ink-soft); user-select: none;
+  }
+  .sec-foot .done-toggle input { width: 1rem; height: 1rem; accent-color: var(--accent); }
+  .sec-foot .spacer { flex: 1; }
+  .nav-btn {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 8px; padding: .5rem .9rem; cursor: pointer; font-size: .9rem;
+    text-decoration: none; display: inline-flex; gap: .4rem; align-items: center;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .nav-btn.primary:hover { color: #fff; filter: brightness(1.05); }
+  .nav-btn[hidden] { display: none; }
+  .fine { font-size: .84rem; color: var(--ink-faint); }
+
+  @media print {
+    nav.side, header.top, .sec-foot, .prompt .copy { display: none !important; }
+    .app:not(.box) { display: block; }
+    section.sec { display: block !important; page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open sections" title="Sections">☰</button>
+    <div class="brand">
+      <span class="eyebrow">mini-agents · study guide</span>
+      <strong>From laptop to production: VMs, Docker, pipelines and security, explained simply</strong>
+    </div>
+    <div class="top-right">
+      <div class="progress" title="Sections marked done"><div class="bar" id="progressBar"></div></div>
+      <span class="progress-label" id="progressLabel">0 / 15 done</span>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle dark mode" title="Light / dark">◐</button>
+    </div>
+  </header>
+
+  <nav class="side" id="side" aria-label="Sections">
+    <ol class="toc" id="toc">
+      <li class="group">Start</li>
+      <li data-sec="start"><a href="#start"><span class="n">00</span>Start here</a></li>
+      <li data-sec="picture"><a href="#picture"><span class="n">01</span>The big picture: what runs where</a></li>
+      <li class="group">The machine</li>
+      <li data-sec="vm"><a href="#vm"><span class="n">02</span>Virtual machines</a></li>
+      <li data-sec="docker"><a href="#docker"><span class="n">03</span>Docker: images and containers</a></li>
+      <li data-sec="compose"><a href="#compose"><span class="n">04</span>Docker Compose: many containers, one file</a></li>
+      <li data-sec="nginx"><a href="#nginx"><span class="n">05</span>nginx: the front door</a></li>
+      <li class="group">Network and security</li>
+      <li data-sec="network"><a href="#network"><span class="n">06</span>Networks, firewalls and VPNs</a></li>
+      <li data-sec="security"><a href="#security"><span class="n">07</span>Security: layers, identities, secrets</a></li>
+      <li data-sec="envs"><a href="#envs"><span class="n">08</span>Environments and configuration</a></li>
+      <li class="group">Delivery</li>
+      <li data-sec="ci"><a href="#ci"><span class="n">09</span>CI: the checks on every merge</a></li>
+      <li data-sec="cd"><a href="#cd"><span class="n">10</span>CD: how code reaches the VM</a></li>
+      <li data-sec="ops"><a href="#ops"><span class="n">11</span>Monitoring and operations</a></li>
+      <li data-sec="iac"><a href="#iac"><span class="n">12</span>Infrastructure as code</a></li>
+      <li class="group">Build it</li>
+      <li data-sec="build"><a href="#build"><span class="n">13</span>Build your own: mini-agents online</a></li>
+      <li class="group">Reference</li>
+      <li data-sec="reference"><a href="#reference"><span class="n">14</span>Cheat sheet, glossary, resources</a></li>
+    </ol>
+  </nav>
+
+  <main class="content" id="content">
+  <div class="inner">
+
+<!-- ===================================================== 00 START ===== -->
+<section class="sec" id="start" data-title="Start here">
+  <p class="eyebrow">Section 00</p>
+  <h1><span class="sec-num">00 · START</span>Start here</h1>
+  <p class="lede">You build agents in Python. The words around them, VM, Docker, CI/CD, virtual network, NSG, TLS, sound like a different job. They are not. Each one is a small idea with a scary name, and this guide takes them one at a time, using the real setup of <strong>agents_and_connectors</strong> as the worked example.</p>
+
+  <div class="tldr">
+    <span class="label">What you will be able to do at the end</span>
+    <ul>
+      <li>Open <code class="inline">azure-pipelines.yml</code>, <code class="inline">docker-compose.yml</code>, <code class="inline">backend.Dockerfile</code> and <code class="inline">scripts/deploy.sh</code> and read them like prose.</li>
+      <li>Draw, from memory, how a request travels from a browser to the database and back, and which fence it passes on the way.</li>
+      <li>Explain why the platform can deploy a new version without anyone noticing.</li>
+      <li>List what you need to put <strong>mini-agents</strong> on the internet, and in which order to set it up (section 13).</li>
+    </ul>
+  </div>
+
+  <h2>How to use this guide</h2>
+  <p>Read one section per sitting. Every section follows the same rhythm: the idea in plain words, then an <em>In this project</em> box that points at the real file, then a pitfall, then two or three questions. Mark a section done at the bottom; the progress bar at the top remembers where you are in this browser.</p>
+  <p>File paths such as <code class="inline">infra/nginx/nginx-proxy.conf</code> are relative to the <code class="inline">agents_and_connectors</code> checkout. Open the file while you read the section. Nothing here replaces reading the real thing; it only makes the real thing readable.</p>
+
+  <div class="box idea">
+    <span class="label">The mental model in one sentence</span>
+    <p>A <strong>VM</strong> is a computer you rent. <strong>Docker</strong> packs your app into a box that runs the same everywhere. <strong>Compose</strong> starts several boxes together. <strong>nginx</strong> is the one door into the machine. The <strong>network and firewall</strong> decide who can reach that door. The <strong>pipeline</strong> is a robot that tests your code and carries it to the machine every time you merge. <strong>Monitoring</strong> is how you find out it broke before a user does.</p>
+  </div>
+
+  <h2>The whole thing in one picture</h2>
+  <div class="diagram">
+    <svg viewBox="0 0 780 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Code travels from a laptop through Azure DevOps and CI to the VM; people reach the VM through nginx">
+      <defs>
+        <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrow"/></marker>
+      </defs>
+      <rect x="6" y="20" width="140" height="70" rx="8" class="d-box"/>
+      <text x="76" y="46" text-anchor="middle" class="d-text">Your laptop</text>
+      <text x="76" y="64" text-anchor="middle" class="d-text sm">write code, run tests</text>
+      <text x="76" y="80" text-anchor="middle" class="d-text mono">git push</text>
+
+      <rect x="164" y="20" width="140" height="70" rx="8" class="d-box"/>
+      <text x="234" y="46" text-anchor="middle" class="d-text">Azure DevOps</text>
+      <text x="234" y="64" text-anchor="middle" class="d-text sm">git repo + pipeline</text>
+      <text x="234" y="80" text-anchor="middle" class="d-text mono">merge to dev / main</text>
+
+      <rect x="322" y="20" width="140" height="70" rx="8" class="d-box hi"/>
+      <text x="392" y="46" text-anchor="middle" class="d-text">CI</text>
+      <text x="392" y="64" text-anchor="middle" class="d-text sm">a rented Ubuntu box</text>
+      <text x="392" y="80" text-anchor="middle" class="d-text mono">lint · test · build</text>
+
+      <rect x="480" y="20" width="140" height="70" rx="8" class="d-box hi"/>
+      <text x="550" y="46" text-anchor="middle" class="d-text">CD</text>
+      <text x="550" y="64" text-anchor="middle" class="d-text sm">an agent on the VM</text>
+      <text x="550" y="80" text-anchor="middle" class="d-text mono">runs deploy.sh</text>
+
+      <rect x="638" y="20" width="136" height="70" rx="8" class="d-box warm"/>
+      <text x="706" y="46" text-anchor="middle" class="d-text">The VM</text>
+      <text x="706" y="64" text-anchor="middle" class="d-text sm">Docker Compose</text>
+      <text x="706" y="80" text-anchor="middle" class="d-text mono">7 containers</text>
+
+      <line x1="146" y1="55" x2="162" y2="55" class="d-line" marker-end="url(#arrA)"/>
+      <line x1="304" y1="55" x2="320" y2="55" class="d-line" marker-end="url(#arrA)"/>
+      <line x1="462" y1="55" x2="478" y2="55" class="d-line" marker-end="url(#arrA)"/>
+      <line x1="620" y1="55" x2="636" y2="55" class="d-line" marker-end="url(#arrA)"/>
+
+      <rect x="638" y="160" width="136" height="60" rx="8" class="d-box"/>
+      <text x="706" y="184" text-anchor="middle" class="d-text">People</text>
+      <text x="706" y="202" text-anchor="middle" class="d-text mono">chat.tccglobal.com</text>
+      <line x1="706" y1="158" x2="706" y2="92" class="d-line hi" marker-end="url(#arrA)"/>
+      <text x="698" y="130" text-anchor="end" class="d-text sm">HTTPS, through nginx</text>
+
+      <rect x="322" y="160" width="296" height="60" rx="8" class="d-box"/>
+      <text x="470" y="184" text-anchor="middle" class="d-text">Azure services the VM calls</text>
+      <text x="470" y="202" text-anchor="middle" class="d-text sm">AI Foundry (models) · Azure ML · Azure SQL warehouse · Key Vault · App Insights</text>
+      <line x1="636" y1="150" x2="620" y2="170" class="d-line" marker-end="url(#arrA)"/>
+    </svg>
+    <p class="cap">Left to right is how code moves. Bottom right is how people reach it. The VM is the only machine you operate yourself; everything else is rented by the minute or run by Microsoft.</p>
+  </div>
+
+  <h2>The seven words, each in one line</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Word</th><th>Plain meaning</th><th>Section</th></tr></thead>
+    <tbody>
+      <tr><td class="k">VM</td><td>A computer in Microsoft's data centre that you rent and log into over the network.</td><td><a href="#vm">02</a></td></tr>
+      <tr><td class="k">Docker image / container</td><td>An image is your app frozen with everything it needs. A container is one running copy of it.</td><td><a href="#docker">03</a></td></tr>
+      <tr><td class="k">Docker Compose</td><td>One YAML file that starts several containers together and lets them find each other by name.</td><td><a href="#compose">04</a></td></tr>
+      <tr><td class="k">Reverse proxy (nginx)</td><td>The single front door: it holds the HTTPS certificate and forwards each request to the right container.</td><td><a href="#nginx">05</a></td></tr>
+      <tr><td class="k">Virtual network, NSG, VPN</td><td>The private neighbourhood the VM lives in, the fence with numbered gates, and the tunnel that puts your laptop inside the neighbourhood.</td><td><a href="#network">06</a></td></tr>
+      <tr><td class="k">CI / CD</td><td>CI: a robot runs the checks on every merge. CD: the same robot puts the code on the machine when the checks pass.</td><td><a href="#ci">09</a>, <a href="#cd">10</a></td></tr>
+      <tr><td class="k">Infrastructure as code</td><td>The VM, firewall and vault described in files, so they can be rebuilt by running a script instead of clicking.</td><td><a href="#iac">12</a></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>You already know more than you think</h2>
+  <p>When you type <code class="inline">make start</code> on your laptop, three things happen: Postgres and Redis start as containers, the FastAPI backend starts with hot reload, and the React app starts on Vite. That is already Docker, already a multi-process system, already an environment called <code class="inline">local</code>. The production VM runs <em>the same code</em>; it only wraps every process in a container, puts nginx in front, and lets a pipeline do the starting instead of you.</p>
+  <p>The pipeline, likewise, is nothing more than the commands you already run before a PR (<code class="inline">ruff check</code>, <code class="inline">pytest</code>, <code class="inline">docker build</code>), written in a YAML file so that someone else's computer runs them every time.</p>
+
+  <div class="box app">
+    <span class="label">In this project: the five files this guide keeps coming back to</span>
+    <ul>
+      <li><code class="inline">azure-pipelines.yml</code>: what the robot does on every merge (sections 09 and 10).</li>
+      <li><code class="inline">backend.Dockerfile</code>: how the app is packed into an image (03).</li>
+      <li><code class="inline">docker-compose.yml</code>: the seven containers and how they are wired (04).</li>
+      <li><code class="inline">infra/nginx/nginx-proxy.conf</code>: the front door and who it lets in (05, 06).</li>
+      <li><code class="inline">scripts/deploy.sh</code> and <code class="inline">scripts/rollout.sh</code>: how a new version replaces the old one without downtime (10).</li>
+    </ul>
+    <p>Two documents in the repo summarise the same ground for engineers: <code class="inline">docs/WIKI/Architecture.md</code> and <code class="inline">docs/WIKI/Deployment.md</code>. Read them after this guide, not before.</p>
+  </div>
+
+  <h2>A fast path</h2>
+  <ol class="steps">
+    <li>Sections 01 and 02: the picture and the machine. Thirty minutes.</li>
+    <li>Sections 03 to 05: Docker, Compose, nginx. Open the three files while reading. One evening.</li>
+    <li>Sections 06 to 08: network, security, configuration. The part that sounds hardest and is mostly vocabulary.</li>
+    <li>Sections 09 to 11: the pipeline and what watches the result. Read <code class="inline">deploy.sh</code> top to bottom once; it is well commented.</li>
+    <li>Section 13: do it. Put mini-agents on a small VM with HTTPS and a GitHub Actions pipeline. Everything before it becomes obvious once you have done it once.</li>
+  </ol>
+
+  <div class="box warn">
+    <span class="label">One warning about the docs you will find in the repo</span>
+    <p><code class="inline">docs/architecture.md</code> still says "there is no automated CI/CD pipeline yet" and "deploy manually". That was true once and is not any more: <code class="inline">azure-pipelines.yml</code> and <code class="inline">docs/WIKI/Deployment.md</code> describe the current, automated flow. When two sources disagree, the YAML and the shell scripts are the truth, because they are what actually runs.</p>
+  </div>
+</section>
+
+<!-- ===================================================== 01 PICTURE ===== -->
+<section class="sec" id="picture" data-title="The big picture">
+  <p class="eyebrow">Section 01</p>
+  <h1><span class="sec-num">01 · THE BIG PICTURE</span>What runs where</h1>
+  <p class="lede">Before any single technology, get the layers straight: what is a machine, what is a box on the machine, what is a service Microsoft runs for you, and what is only a file that tells a robot what to do.</p>
+
+  <h2>An analogy to hang everything on: a restaurant</h2>
+  <ul>
+    <li><strong>The building you rent</strong> is the VM. You do not own it, you cannot touch it, but inside it you decide everything.</li>
+    <li><strong>The kitchen stations</strong> are containers. Each has exactly the equipment it needs and nothing else; the pastry station does not have a grill. If one station burns down you rebuild that one.</li>
+    <li><strong>The host at the door</strong> is nginx. Every guest passes the host, who checks the reservation, points them to a table, and turns strangers away.</li>
+    <li><strong>The pantry</strong> is Postgres (and Redis for the sticky notes). Stations come and go; the pantry is what must survive.</li>
+    <li><strong>The fence and the gates</strong> are the Azure network and its security group. Deliveries come through one gate, guests through another, and the back alley is closed.</li>
+    <li><strong>The delivery truck</strong> is the pipeline. It brings the new menu, and the restaurant swaps it in while guests keep eating.</li>
+    <li><strong>The suppliers</strong> are Azure services: the models (AI Foundry), the prediction endpoints (Azure ML), the warehouse (Azure SQL). The restaurant calls them; it does not run them.</li>
+  </ul>
+
+  <h2>The layers, with this project's answer for each</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Layer</th><th>What it is</th><th>In this project</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Code</td><td>The application itself.</td><td>FastAPI backend and the agents in <code class="inline">src/</code>; the React app in <code class="inline">chatkit/app</code>.</td></tr>
+      <tr><td class="k">Packaging</td><td>How the code and its dependencies are frozen into something that runs the same everywhere.</td><td>One Docker image from <code class="inline">backend.Dockerfile</code>, reused by four services.</td></tr>
+      <tr><td class="k">Orchestration</td><td>What starts the pieces, connects them, restarts them.</td><td>Docker Compose, <code class="inline">docker-compose.yml</code>: nginx, backend ×2, mcp-server ×2, postgres, redis, worker, watchdog.</td></tr>
+      <tr><td class="k">Machine</td><td>Where it all runs.</td><td>Two Azure VMs (dev and prod), Ubuntu 22.04, 2 vCPUs each.</td></tr>
+      <tr><td class="k">Network</td><td>Who can reach the machine, on which port, from where.</td><td>A subnet from IT, a network security group with three allow rules, nginx's own allow-lists.</td></tr>
+      <tr><td class="k">Managed services</td><td>Things you call but never operate.</td><td>Azure AI Foundry (every model), Azure ML endpoints, Azure SQL (the warehouse), Key Vault, Blob Storage, Application Insights, Microsoft Entra (sign-in).</td></tr>
+      <tr><td class="k">Delivery</td><td>How a merge becomes a running version.</td><td>Azure DevOps Pipelines (<code class="inline">azure-pipelines.yml</code>) running <code class="inline">scripts/deploy.sh</code> on the VM.</td></tr>
+      <tr><td class="k">Watching</td><td>How you learn it broke.</td><td>A watchdog container, timers on the host, Azure Monitor emails, Application Insights traces.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Inside the VM</h2>
+  <div class="diagram">
+    <svg viewBox="0 0 780 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inside the VM: nginx forwards to backend and mcp-server replicas, which use postgres and redis; worker and watchdog run beside them">
+      <defs>
+        <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrow"/></marker>
+      </defs>
+      <rect x="6" y="6" width="768" height="300" rx="12" class="d-box" stroke-dasharray="6 4"/>
+      <text x="20" y="28" class="d-text mono">Azure VM · Ubuntu 22.04 · Docker Compose · network "agent-network"</text>
+
+      <rect x="290" y="42" width="200" height="54" rx="8" class="d-box warm"/>
+      <text x="390" y="64" text-anchor="middle" class="d-text">nginx</text>
+      <text x="390" y="82" text-anchor="middle" class="d-text mono">listens on :80 and :443</text>
+
+      <rect x="110" y="140" width="220" height="60" rx="8" class="d-box hi"/>
+      <text x="220" y="162" text-anchor="middle" class="d-text">backend ×2</text>
+      <text x="220" y="180" text-anchor="middle" class="d-text mono">FastAPI + the web app · :8000</text>
+
+      <rect x="450" y="140" width="220" height="60" rx="8" class="d-box hi"/>
+      <text x="560" y="162" text-anchor="middle" class="d-text">mcp-server ×2</text>
+      <text x="560" y="180" text-anchor="middle" class="d-text mono">agents for other platforms · :8001</text>
+
+      <line x1="360" y1="98" x2="250" y2="138" class="d-line" marker-end="url(#arrB)"/>
+      <line x1="420" y1="98" x2="530" y2="138" class="d-line" marker-end="url(#arrB)"/>
+
+      <rect x="30" y="240" width="150" height="54" rx="8" class="d-box"/>
+      <text x="105" y="262" text-anchor="middle" class="d-text">postgres</text>
+      <text x="105" y="280" text-anchor="middle" class="d-text mono">chats, uploads · :5432</text>
+
+      <rect x="210" y="240" width="150" height="54" rx="8" class="d-box"/>
+      <text x="285" y="262" text-anchor="middle" class="d-text">redis</text>
+      <text x="285" y="280" text-anchor="middle" class="d-text mono">sessions, caches · :6379</text>
+
+      <rect x="420" y="240" width="150" height="54" rx="8" class="d-box"/>
+      <text x="495" y="262" text-anchor="middle" class="d-text">worker</text>
+      <text x="495" y="280" text-anchor="middle" class="d-text mono">parses uploads</text>
+
+      <rect x="600" y="240" width="150" height="54" rx="8" class="d-box"/>
+      <text x="675" y="262" text-anchor="middle" class="d-text">watchdog</text>
+      <text x="675" y="280" text-anchor="middle" class="d-text mono">health checks, incidents</text>
+
+      <line x1="180" y1="202" x2="120" y2="238" class="d-line" marker-end="url(#arrB)"/>
+      <line x1="240" y1="202" x2="275" y2="238" class="d-line" marker-end="url(#arrB)"/>
+      <line x1="500" y1="202" x2="170" y2="240" class="d-line" marker-end="url(#arrB)"/>
+      <line x1="530" y1="202" x2="340" y2="240" class="d-line" marker-end="url(#arrB)"/>
+
+      <text x="390" y="336" text-anchor="middle" class="d-text sm">Only nginx is reachable from outside. Postgres and Redis answer on the VM's localhost only; the other five publish no port at all.</text>
+    </svg>
+    <p class="cap">The worker and the watchdog also read Postgres; the arrows are left out to keep the picture readable. All seven run from two images: the official nginx, postgres and redis images, and one image built from <code class="inline">backend.Dockerfile</code> for the four Python services.</p>
+  </div>
+
+  <h2>Three places the same code runs</h2>
+  <div class="cards">
+    <div class="card"><span class="tag">local</span><h3>Your laptop</h3><p><code class="inline">make start</code>. Postgres and Redis in containers, backend and frontend as plain processes with hot reload. No login: you are a synthetic admin user.</p></div>
+    <div class="card"><span class="tag">dev</span><h3>The dev VM</h3><p>Every merge to the <code class="inline">dev</code> branch deploys here. Internal hostname <code class="inline">dev-chat.tccglobal.com</code>. Real sign-in, real warehouse, test data.</p></div>
+    <div class="card"><span class="tag">prod</span><h3>The prod VM</h3><p>Every merge to <code class="inline">main</code> deploys here. <code class="inline">chat.tccglobal.com</code>. A release is a pull request from <code class="inline">dev</code> to <code class="inline">main</code>.</p></div>
+  </div>
+  <p>Same code, same <code class="inline">config.yaml</code>, same nginx file. The only thing that differs between the two VMs is one line in a git-ignored <code class="inline">.env</code> file: <code class="inline">APP_ENV=dev</code> or <code class="inline">APP_ENV=prod</code>. Section 08 explains why that discipline matters.</p>
+
+  <div class="box app">
+    <span class="label">In this project: why everything sits on one VM</span>
+    <p><code class="inline">docs/WIKI/Architecture.md</code> gives the reasons: an internal audience with modest traffic, a small team that must be able to operate it, and Compose making any container replaceable on its own. Kubernetes or Azure Container Apps is a known later step, not a missing piece. This is the right instinct for your own projects too: <strong>one machine, a handful of containers, a pipeline</strong> covers more ground than most people expect.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: confusing "a service" with "a machine"</span>
+    <p>When someone says "the backend is down" they mean the backend containers, not the VM. When they say "the VM is down" nothing on it answers, including nginx and the watchdog. The monitoring in section 11 is built around exactly this difference: each VM watches its own containers, and Azure watches the VM from outside.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Which pieces of this platform does the team operate themselves, and which does Microsoft run?</summary><p>Themselves: the two VMs and the seven containers on each (nginx, backend, mcp-server, postgres, redis, worker, watchdog), plus the pipeline definition. Microsoft: AI Foundry (models), Azure ML endpoints, Azure SQL, Key Vault, Blob Storage, Application Insights, Entra sign-in, the pipeline's hosted build agents, and the physical hardware under the VMs.</p></details>
+  <details class="qa"><summary>Where does the model actually run when an agent answers?</summary><p>Not on the VM. The backend container calls Azure AI Foundry over HTTPS; the VM only runs the orchestration around the call (prompt, tools, streaming the answer back).</p></details>
+  <details class="qa"><summary>What is the one difference between the dev VM and the prod VM in terms of configuration?</summary><p><code class="inline">APP_ENV</code> in each VM's <code class="inline">.env</code>. It selects the <code class="inline">environments.dev</code> or <code class="inline">environments.prod</code> block in <code class="inline">config.yaml</code> (vault, identity, sign-in app, URLs). Everything else in <code class="inline">.env</code> is a secret, not a setting.</p></details>
+</section>
+
+<!-- ===================================================== 02 VM ===== -->
+<section class="sec" id="vm" data-title="Virtual machines">
+  <p class="eyebrow">Section 02</p>
+  <h1><span class="sec-num">02 · THE MACHINE</span>Virtual machines</h1>
+  <p class="lede">A virtual machine is a computer you never see. You pick its size and operating system, Azure carves it out of a much bigger server, and you log into it over the network. Everything in this platform ultimately runs on two of them.</p>
+
+  <h2>Physical, virtual, container, managed: four ways to run a program</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Way</th><th>What you get</th><th>What you manage</th><th>Example here</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Physical machine</td><td>A real box.</td><td>Everything, including the hardware.</td><td>Your laptop.</td></tr>
+      <tr><td class="k">Virtual machine</td><td>A slice of a big server, with its own OS, disk and IP.</td><td>The OS and everything on it. Not the hardware.</td><td><code class="inline">AZ-DEV-SV-MCP01</code>, <code class="inline">AZ-PRD-SV-MCP01</code>.</td></tr>
+      <tr><td class="k">Container</td><td>A process in a box on a machine, with its own files and network view.</td><td>What is in the box. The OS underneath belongs to the VM.</td><td>The backend container (section 03).</td></tr>
+      <tr><td class="k">Managed service (PaaS)</td><td>A running thing behind an API.</td><td>Nothing but your configuration and your bill.</td><td>Azure AI Foundry, Key Vault, Azure SQL.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The trade is always the same: the further down the table, the less you can break and the less you can change. The team chose VMs because Docker Compose on a VM is simple to reason about, cheap, and lets them run anything (an ODBC driver, headless Chromium, Tesseract) without asking a platform for permission.</p>
+
+  <h2>The words on a VM's spec sheet</h2>
+  <ul>
+    <li><strong>Size</strong>: a name like <code class="inline">Standard_B2as_v2</code>. <em>B</em> is the burstable family (cheap, can sprint briefly), <em>2</em> is two vCPUs, <em>a</em> means AMD, <em>s</em> means it supports premium disks. Roughly: a modest two-core laptop that never sleeps.</li>
+    <li><strong>Image</strong>: the operating system it starts from. Here Ubuntu 22.04 LTS, the most common choice for servers; "LTS" means it gets security updates for years.</li>
+    <li><strong>OS disk</strong>: its hard drive. 128 GB standard SSD here. Docker images and Postgres live on it.</li>
+    <li><strong>Region and zone</strong>: which data centre (<code class="inline">westeurope</code>, that is the Netherlands) and which building inside it (zone 1).</li>
+    <li><strong>NIC and IPs</strong>: its network card, with a private IP inside the company network and, optionally, a public IP on the internet. Section 06.</li>
+    <li><strong>Admin user and SSH key</strong>: how you log in. The user is <code class="inline">tccadmin</code>; password login is disabled, only an SSH key works.</li>
+    <li><strong>Managed identity</strong>: the VM's own badge in Azure, so it can read Key Vault or Blob Storage without a password anywhere on disk. Section 07.</li>
+  </ul>
+
+  <h2>SSH: the way in</h2>
+  <p>SSH is a secure remote terminal. You type on your laptop, the commands run on the VM. It uses a key pair: the public half sits on the VM in <code class="inline">~/.ssh/authorized_keys</code>, the private half stays on your laptop and never leaves it. From the TCC network or the VPN:</p>
+  <pre class="code"><span class="c"># the dev VM, by its private IP</span>
+ssh tccadmin@172.16.126.36
+
+<span class="c"># once there: where the code is, what is running</span>
+cd /home/code/agents_and_connectors
+sudo docker compose ps</pre>
+  <p>Keys beat passwords for one reason: a password can be guessed from anywhere on the internet, a 256-bit key cannot. The Bicep file that builds the prod VM sets <code class="inline">disablePasswordAuthentication: true</code>, so there is nothing to guess.</p>
+
+  <div class="box app">
+    <span class="label">In this project: the two VMs</span>
+    <div class="tw"><table class="t">
+      <thead><tr><th></th><th>Dev</th><th>Prod</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Name</td><td><code class="inline">AZ-DEV-SV-MCP01</code></td><td><code class="inline">AZ-PRD-SV-MCP01</code></td></tr>
+        <tr><td class="k">Subscription / group</td><td>MCA - DA Dev / <code class="inline">RG_DAMCP_Dev</code></td><td>MCA - DA Prod / <code class="inline">RG_DAMCP_Prod</code></td></tr>
+        <tr><td class="k">Deploys from</td><td>branch <code class="inline">dev</code>, every merge</td><td>branch <code class="inline">main</code>, every merge</td></tr>
+        <tr><td class="k">Hostname</td><td><code class="inline">dev-chat.tccglobal.com</code>, internal DNS only</td><td><code class="inline">chat.tccglobal.com</code>, internal and public DNS</td></tr>
+        <tr><td class="k">Private IP</td><td><code class="inline">172.16.126.36</code></td><td><code class="inline">172.16.26.36</code></td></tr>
+        <tr><td class="k">Key Vault</td><td><code class="inline">AZ-DEV-SV-MCP-KV-01</code></td><td><code class="inline">AZ-PRD-SV-MCP-KV-01</code></td></tr>
+        <tr><td class="k">Size, OS</td><td colspan="2">Standard_B2as_v2 (2 vCPU), Ubuntu 22.04, 128 GB SSD, zone 1</td></tr>
+        <tr><td class="k">Code lives at</td><td colspan="2"><code class="inline">/home/code/agents_and_connectors</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Source: <code class="inline">infra/app-vm/README.md</code> and <code class="inline">infra/app-vm/main.bicep</code>. The dev VM was set up by hand first; the prod VM was built from the Bicep file, with the hand-done steps written down as <code class="inline">cloud-init.yaml</code>.</p>
+  </div>
+
+  <h2>What a fresh VM needs before it can run the stack</h2>
+  <p>A bare Ubuntu VM has no Docker and no git. <code class="inline">infra/app-vm/cloud-init.yaml</code> is the list of what the first boot installs; cloud-init is the standard way to run commands on a brand-new VM before anyone logs in:</p>
+  <pre class="code"><span class="c">#cloud-config</span>
+packages:
+- ca-certificates
+- curl
+- git
+- jq
+- postgresql-client
+runcmd:
+- curl -fsSL https://get.docker.com | sh        <span class="c"># Docker + Compose</span>
+- usermod -aG docker tccadmin                  <span class="c"># let the admin run docker</span>
+- curl -sL https://aka.ms/InstallAzureCLIDeb | bash   <span class="c"># the az command</span>
+- install -d -o tccadmin -g tccadmin /home/code <span class="c"># where the repo will go</span></pre>
+  <p>What cloud-init deliberately does <em>not</em> do: clone the repo, write <code class="inline">.env</code>, copy the TLS certificate, or register the pipeline agent. Those need credentials, and a file checked into git must never carry credentials. They are the runbook's manual steps in <code class="inline">infra/app-vm/README.md</code>.</p>
+
+  <h2>What keeps it running after a reboot</h2>
+  <p>Two things. Docker itself starts at boot as a system service. Then <code class="inline">infra/systemd/mcp-stack.service</code> tells systemd (Linux's service manager) to run <code class="inline">docker compose up -d</code> in the repo folder once Docker is up. On top of that, every container in <code class="inline">docker-compose.yml</code> has <code class="inline">restart: unless-stopped</code>, so Docker restarts a crashed container on its own.</p>
+  <pre class="code"><span class="c"># a systemd unit is a small ini file: what to run, when, where</span>
+[Unit]
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/code/agents_and_connectors
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target   <span class="c"># "start at normal boot"</span></pre>
+
+  <h2>What the VM does not do</h2>
+  <p>It does not run the language models (AI Foundry does). It does not hold the data warehouse (Azure SQL does). It does not store secrets as its main copy (Key Vault does). It runs the application, its database, its cache and its front door, and it calls everything else over HTTPS. That is why a two-core machine is enough.</p>
+
+  <div class="box warn">
+    <span class="label">Pitfall: pets and cattle</span>
+    <p>A server you set up by hand is a <em>pet</em>: unique, and nobody remembers what was done to it. The dev VM started that way. A server built from a file is <em>cattle</em>: lose it, run the script, get an identical one. The move from one to the other is exactly what <code class="inline">infra/app-vm/</code> did for prod. Whenever you type something on a server, write it down somewhere in the repo the same day.</p>
+  </div>
+
+  <div class="box idea">
+    <span class="label">For your own project</span>
+    <p>One small Linux VM is plenty for a hobby agent app. Two vCPUs and 4 GB of RAM run Postgres, a Python API and a reverse proxy comfortably; 1 GB gets tight once Postgres and a build run at the same time. Pick Ubuntu LTS, log in with an SSH key only, and install Docker with the same one-liner this project uses.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why does the prod VM refuse password logins?</summary><p>A password can be brute-forced from anywhere that can reach port 22. An SSH key cannot be guessed, and its private half never leaves your laptop. Disabling password authentication removes the whole attack.</p></details>
+  <details class="qa"><summary>Why are the repo clone, <code class="inline">.env</code> and the certificate not in <code class="inline">cloud-init.yaml</code>?</summary><p>They need credentials or are credentials (a token to clone, the secrets in <code class="inline">.env</code>, the private key of the certificate). <code class="inline">cloud-init.yaml</code> is committed to git, so it may only contain things that are safe for anyone with repo access to read.</p></details>
+  <details class="qa"><summary>The VM reboots at 3 am. What brings the application back, in order?</summary><p>Docker starts as a system service; the <code class="inline">mcp-stack</code> systemd unit then runs <code class="inline">docker compose up -d</code> in the repo folder; each container's <code class="inline">restart: unless-stopped</code> policy also brings back anything that was running before the reboot.</p></details>
+</section>
+
+<!-- ===================================================== 03 DOCKER ===== -->
+<section class="sec" id="docker" data-title="Docker">
+  <p class="eyebrow">Section 03</p>
+  <h1><span class="sec-num">03 · PACKAGING</span>Docker: images and containers</h1>
+  <p class="lede">"It works on my machine" is the oldest problem in software. Docker solves it by shipping the machine along with the code: a frozen filesystem with Python, the libraries, the system packages and your source, that runs identically on your laptop, in CI and on the VM.</p>
+
+  <h2>Image versus container</h2>
+  <ul>
+    <li>An <strong>image</strong> is a read-only snapshot: a Linux filesystem with everything your app needs, built once from a recipe called a <strong>Dockerfile</strong>. Think of a frozen ready meal with the cooking instructions printed on it.</li>
+    <li>A <strong>container</strong> is one running copy of an image: a normal Linux process, given its own view of the filesystem, its own network address and its own hostname. The meal being heated and eaten. You can heat two from the same box at the same time; this project runs two backend containers from one image.</li>
+    <li>A <strong>volume</strong> is a folder that lives outside the container, so it survives when the container is thrown away. Postgres's data directory is a volume; the container is disposable, the data is not.</li>
+    <li>A <strong>port publish</strong> (<code class="inline">-p 8000:8000</code>) connects a port on the machine to a port inside the container. Without it, nothing outside can talk to the process.</li>
+  </ul>
+  <p>Images are built in <strong>layers</strong>, one per Dockerfile instruction, and each layer is cached. Order the Dockerfile so that what changes rarely (installing dependencies) comes before what changes often (copying your source), and rebuilds take seconds instead of minutes.</p>
+
+  <h2>Read the real Dockerfile</h2>
+  <p><code class="inline">backend.Dockerfile</code> is a <strong>multi-stage build</strong>: three temporary images, of which only the last one ships. Here it is, abridged, with the reasons the comments in the file give:</p>
+  <pre class="code"><span class="c"># ── Stage 1: install Python dependencies ───────────────────────────</span>
+<span class="k">FROM</span> python:3.12-slim <span class="k">AS</span> builder
+<span class="k">COPY</span> --from=ghcr.io/astral-sh/uv:0.12 /uv /uvx /bin/     <span class="c"># bring in uv</span>
+<span class="k">WORKDIR</span> /app
+<span class="k">RUN</span> --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
+<span class="c"># --locked: fail if uv.lock disagrees with pyproject.toml. Never re-resolve in a build.</span>
+
+<span class="c"># ── Stage 2: build the React app ───────────────────────────────────</span>
+<span class="k">FROM</span> node:22-alpine <span class="k">AS</span> frontend
+<span class="k">WORKDIR</span> /app
+<span class="k">COPY</span> chatkit/package.json chatkit/pnpm-lock.yaml ...   <span class="c"># manifests first: cache</span>
+<span class="k">RUN</span> pnpm install --frozen-lockfile --ignore-scripts
+<span class="k">COPY</span> chatkit/ ./
+<span class="k">RUN</span> pnpm --filter campaign-forecasting-app build         <span class="c"># → /app/app/dist</span>
+
+<span class="c"># ── Stage 3: the image that ships ──────────────────────────────────</span>
+<span class="k">FROM</span> python:3.12-slim <span class="k">AS</span> production
+<span class="k">WORKDIR</span> /app
+<span class="k">RUN</span> groupadd --gid 1000 appgroup \
+    &amp;&amp; useradd --uid 1000 --gid appgroup --create-home appuser   <span class="c"># non-root</span>
+<span class="k">RUN</span> apt-get install ... curl libgomp1 tesseract-ocr msodbcsql18   <span class="c"># OS packages</span>
+<span class="k">COPY</span> --from=builder /app/.venv /app/.venv          <span class="c"># the dependencies, nothing else</span>
+<span class="k">ENV</span> PATH=<span class="s">"/app/.venv/bin:$PATH"</span>
+<span class="k">RUN</span> python -m playwright install --with-deps chromium   <span class="c"># for the Slides export</span>
+<span class="k">COPY</span> --chown=appuser:appgroup src/ ./src/
+<span class="k">COPY</span> --chown=appuser:appgroup config.yaml auth/ ...
+<span class="k">COPY</span> --from=frontend --chown=appuser:appgroup /app/app/dist ./frontend/
+<span class="k">USER</span> appuser
+<span class="k">EXPOSE</span> 8000
+<span class="k">HEALTHCHECK</span> --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+<span class="k">CMD</span> [<span class="s">"fastapi"</span>, <span class="s">"run"</span>, <span class="s">"--entrypoint"</span>, <span class="s">"src.api.chatkit_server:app"</span>, <span class="s">"--port"</span>, <span class="s">"8000"</span>]</pre>
+
+  <h3>Why each decision</h3>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Decision</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Three stages</td><td>The build tools (uv's cache, node, pnpm, the npm packages) never reach the final image. Smaller image, less to attack, faster to start.</td></tr>
+      <tr><td class="k">Install from the lock file</td><td><code class="inline">uv sync --locked</code> installs exactly the versions in <code class="inline">uv.lock</code>. The image you tested is the image you ship. If the lock is stale, the build fails instead of quietly picking newer versions.</td></tr>
+      <tr><td class="k">Manifests before source</td><td>Copying <code class="inline">pyproject.toml</code> and the lock first means the slow dependency layer is cached until they change. A code-only change rebuilds in seconds.</td></tr>
+      <tr><td class="k">Non-root user (uid 1000)</td><td>If the app is ever compromised, the attacker is an unprivileged user inside a container, not root on the VM. This uid matters again in section 10: files the container writes must be owned by it.</td></tr>
+      <tr><td class="k">HEALTHCHECK</td><td>Docker calls <code class="inline">/api/health</code> every 30 s and marks the container healthy or unhealthy. Compose, nginx and the deploy script all rely on that status.</td></tr>
+      <tr><td class="k">One process per container</td><td>The comment on the <code class="inline">CMD</code> explains it: with one process, a stop signal closes the port immediately and nginx moves on to the other replica. A multi-worker server kept the port open and queued requests nobody answered. Compose runs two containers instead of one container with two workers.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Commands you will actually type</h2>
+  <pre class="code">docker build -f backend.Dockerfile -t mcp-backend:ci .   <span class="c"># recipe → image (what CI does)</span>
+docker images                                             <span class="c"># images on this machine</span>
+docker run --rm -p 8000:8000 --env-file .env mcp-backend:ci   <span class="c"># image → container</span>
+docker ps                                                 <span class="c"># running containers</span>
+docker logs -f &lt;container&gt;                                <span class="c"># its output</span>
+docker exec -it &lt;container&gt; bash                          <span class="c"># a shell inside it</span>
+docker stop &lt;container&gt;                                   <span class="c"># SIGTERM, then SIGKILL after a grace period</span>
+docker system prune                                       <span class="c"># free disk: old images, stopped containers</span></pre>
+
+  <div class="box app">
+    <span class="label">In this project: one image, four jobs</span>
+    <p>The backend, the MCP server, the worker and the watchdog all run <em>the same image</em>; Compose gives each a different <code class="inline">command</code> (<code class="inline">uvicorn src.api.mcp_server:app</code>, <code class="inline">python -m src.tasks.worker</code>, <code class="inline">python -m src.ops.watchdog</code>). One build, one set of dependencies to keep in sync, one thing to test. The image is built on the VM itself during a deploy (about six minutes on two cores) and separately in CI on a hosted agent, where it is thrown away: that CI step exists only to prove the Dockerfile still builds.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: who owns the folder</span>
+    <p>When a container mounts a host folder that does not exist yet, Docker creates it <em>as root</em>. The container runs as uid 1000, so it then cannot write there. This happened for real: <code class="inline">data/recast</code> shipped without being pre-created, Docker made it as root, and every reCAST reprojection failed with "Permission denied" until the deploy script learned to create the folder with the right owner first. Section 10 shows where.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>What is the difference between an image and a container, in one sentence each?</summary><p>An image is a frozen, read-only filesystem built from a Dockerfile. A container is one running process started from that image, with its own writable layer, network address and hostname.</p></details>
+  <details class="qa"><summary>Why copy <code class="inline">pyproject.toml</code> and <code class="inline">uv.lock</code> before copying <code class="inline">src/</code>?</summary><p>Layer caching. The dependency install layer is rebuilt only when those two files change. If the source were copied first, every code change would invalidate the cache and reinstall every package.</p></details>
+  <details class="qa"><summary>You edit <code class="inline">pyproject.toml</code> to add a package but forget to run <code class="inline">uv lock</code>. What happens to the Docker build?</summary><p>It fails. <code class="inline">uv sync --locked</code> refuses to run when the lock file no longer matches <code class="inline">pyproject.toml</code>. That is a feature: the alternative is an image with versions nobody chose.</p></details>
+</section>
+
+<!-- ===================================================== 04 COMPOSE ===== -->
+<section class="sec" id="compose" data-title="Docker Compose">
+  <p class="eyebrow">Section 04</p>
+  <h1><span class="sec-num">04 · ORCHESTRATION</span>Docker Compose: many containers, one file</h1>
+  <p class="lede">A real application is several processes: a database, a cache, the API, a background worker, a proxy. Compose describes them all in one YAML file, starts them in the right order on a private network, and restarts the ones that fall over.</p>
+
+  <h2>The vocabulary of a compose file</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Key</th><th>Meaning</th><th>In <code class="inline">docker-compose.yml</code></th></tr></thead>
+    <tbody>
+      <tr><td class="k">services</td><td>One entry per container type.</td><td>postgres, backend, mcp-server, nginx, redis, worker, ingest, watchdog.</td></tr>
+      <tr><td class="k">image / build</td><td>Use a ready image, or build one from a Dockerfile.</td><td><code class="inline">image: nginx:alpine</code> versus <code class="inline">build: {dockerfile: backend.Dockerfile}</code>.</td></tr>
+      <tr><td class="k">command</td><td>Override what the image runs.</td><td>The worker, watchdog and MCP server override the backend image's default.</td></tr>
+      <tr><td class="k">environment / env_file</td><td>Environment variables for the process.</td><td><code class="inline">DATABASE_URL</code>, <code class="inline">APP_VERSION</code>; <code class="inline">.env</code> is optional because the VM reads secrets from Key Vault.</td></tr>
+      <tr><td class="k">volumes</td><td>Folders shared with the host (bind mounts) or managed by Docker (named volumes).</td><td><code class="inline">./data/uploads:/app/data/uploads</code> (bind); <code class="inline">chatkit-postgres18-data</code> (named).</td></tr>
+      <tr><td class="k">ports</td><td>Which container ports the host exposes, and on which address.</td><td><code class="inline">127.0.0.1:5432:5432</code> for Postgres; <code class="inline">80:80</code> and <code class="inline">443:443</code> for nginx; nothing for the backend.</td></tr>
+      <tr><td class="k">networks</td><td>The private network the containers share. Each service's name becomes a DNS name on it.</td><td>One bridge network, <code class="inline">agent-network</code>. The backend reaches Postgres at <code class="inline">postgres:5432</code>.</td></tr>
+      <tr><td class="k">healthcheck</td><td>A command Docker runs to decide "healthy".</td><td><code class="inline">pg_isready</code>, <code class="inline">redis-cli ping</code>, <code class="inline">curl /api/health</code>, a heartbeat file's age for the worker and watchdog.</td></tr>
+      <tr><td class="k">depends_on</td><td>Start order, optionally waiting for health.</td><td>The backend waits for <code class="inline">postgres</code> and <code class="inline">redis</code> to be <em>healthy</em>, not merely started.</td></tr>
+      <tr><td class="k">restart</td><td>What to do when the process exits.</td><td><code class="inline">unless-stopped</code> everywhere: come back after a crash or a reboot, unless someone stopped it on purpose.</td></tr>
+      <tr><td class="k">deploy.replicas</td><td>How many copies to run.</td><td>Two for the backend and the MCP server.</td></tr>
+      <tr><td class="k">stop_grace_period</td><td>How long a container may take to finish after the stop signal.</td><td>180 s for the backend, so a streaming answer can complete during a deploy.</td></tr>
+      <tr><td class="k">profiles</td><td>Services that start only when asked.</td><td><code class="inline">ingest</code> runs only with <code class="inline">--profile tools</code>.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The backend service, annotated</h2>
+  <pre class="code">backend:
+  build:
+    context: .
+    dockerfile: backend.Dockerfile
+  deploy:
+    replicas: 2                 <span class="c"># two containers, no container_name, no host port:</span>
+                                <span class="c"># nginx finds both through Docker's DNS (section 05)</span>
+  stop_grace_period: 180s       <span class="c"># let a streamed answer finish when a deploy retires this copy</span>
+  env_file:
+  - path: .env
+    required: false             <span class="c"># on the VM secrets come from Key Vault instead</span>
+  volumes:
+  - ./data/uploads:/app/data/uploads        <span class="c"># user files, outside the container</span>
+  - ./data/sessions:/app/data/sessions
+  - ./skills:/app/skills:ro                 <span class="c"># :ro = read-only</span>
+  environment:
+    DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/chatkit
+    APP_VERSION: ${APP_VERSION:-dev}        <span class="c"># the commit, set by deploy.sh</span>
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis:    { condition: service_healthy }
+  healthcheck:
+    test: [CMD, curl, -f, http://localhost:8000/api/health]
+    interval: 30s
+    start_period: 90s           <span class="c"># time to boot before failures count</span>
+    start_interval: 2s          <span class="c"># but check often, so a new replica takes traffic fast</span>
+    retries: 3
+  restart: unless-stopped
+  networks:
+  - agent-network</pre>
+  <p>Notice what is <em>not</em> there: no <code class="inline">ports</code>. The backend is unreachable from the VM's network card. Only nginx, on the same private Docker network, can call it. That is the single most important line in the file, and it is a line that is missing.</p>
+
+  <h2>The private network</h2>
+  <p>Compose creates a virtual switch (<code class="inline">agent-network</code>, driver <code class="inline">bridge</code>) and plugs every container into it. On that network, service names are hostnames: <code class="inline">postgres</code>, <code class="inline">redis</code>, <code class="inline">backend</code>, <code class="inline">mcp-server</code>. When a service has two replicas, its name resolves to <em>both</em> addresses, which is how nginx load-balances without being told anything. This traffic never leaves the VM.</p>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Who</th><th>Can reach</th><th>Cannot reach</th></tr></thead>
+    <tbody>
+      <tr><td class="k">A browser on the TCC network</td><td>nginx on 80 and 443</td><td>Any container directly</td></tr>
+      <tr><td class="k">Someone logged into the VM by SSH</td><td>nginx; Postgres and Redis on <code class="inline">127.0.0.1</code></td><td>The backend and MCP server by port (they publish none; use <code class="inline">docker exec</code>)</td></tr>
+      <tr><td class="k">The nginx container</td><td><code class="inline">backend:8000</code>, <code class="inline">mcp-server:8001</code></td><td>(it never needs the database)</td></tr>
+      <tr><td class="k">The backend container</td><td><code class="inline">postgres:5432</code>, <code class="inline">redis:6379</code>, the internet (Foundry, Azure ML, Key Vault)</td><td></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>What survives, what does not</h2>
+  <ul>
+    <li><strong>Named volumes</strong> survive <code class="inline">docker compose down</code> and image rebuilds: <code class="inline">chatkit-postgres18-data</code> (the database), <code class="inline">agent-redis-data</code>. They die only with <code class="inline">down -v</code> or <code class="inline">docker volume rm</code>.</li>
+    <li><strong>Bind mounts</strong> are ordinary folders in the repo checkout: <code class="inline">data/uploads</code>, <code class="inline">data/sessions</code>, <code class="inline">data/presentations</code>, <code class="inline">data/recast</code>, <code class="inline">data/ops</code>, <code class="inline">data/backups</code>. Git ignores them; a deploy must not delete them.</li>
+    <li><strong>Everything else inside a container</strong> is gone when the container is replaced. If your code writes a file somewhere that is not a mount, the next deploy erases it.</li>
+  </ul>
+
+  <h2>The commands</h2>
+  <pre class="code">docker compose up -d                 <span class="c"># start everything in the background (create what is missing)</span>
+docker compose up -d --build         <span class="c"># rebuild images first</span>
+docker compose ps                    <span class="c"># state and health of each service</span>
+docker compose logs -f backend       <span class="c"># follow one service's logs</span>
+docker compose exec backend bash     <span class="c"># shell in a running container</span>
+docker compose restart worker
+docker compose down                  <span class="c"># stop and remove containers; volumes stay</span>
+docker compose down -v               <span class="c"># ... and delete the volumes. Destroys the database.</span></pre>
+
+  <div class="box app">
+    <span class="label">In this project: laptop versus VM</span>
+    <p><code class="inline">make start</code> runs only <code class="inline">postgres</code> and <code class="inline">redis</code> from the compose file and starts the backend and the frontend as plain processes, because hot reload is faster that way. <code class="inline">make up</code> runs the full compose stack exactly as the VM does, but nginx then wants the VM's certificate in <code class="inline">certs/</code> and only answers to the VMs' hostnames, so on a laptop it is a way to test the containers, not to use the app. The wiki's <em>Getting-Started</em> page describes both.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: one colon changes everything</span>
+    <p><code class="inline">ports: ["127.0.0.1:5432:5432"]</code> opens Postgres to the VM's own localhost only. <code class="inline">ports: ["5432:5432"]</code> opens it on every network card of the VM, and then only the firewall stands between the internet and your database. Beginners write the second form because tutorials do. This project writes the first.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why does the backend service have neither a <code class="inline">container_name</code> nor a <code class="inline">ports</code> entry?</summary><p>Two replicas cannot share one fixed name, and a deploy starts the new copies next to the old ones before stopping anything, so there are briefly four. A published host port could be bound by only one of them. nginx reaches all of them by DNS on the private network instead.</p></details>
+  <details class="qa"><summary>What does <code class="inline">condition: service_healthy</code> buy over plain <code class="inline">depends_on</code>?</summary><p>Plain <code class="inline">depends_on</code> waits for the container to <em>start</em>; Postgres takes a few seconds more to accept connections. With the health condition the backend starts only once <code class="inline">pg_isready</code> succeeds, so it does not crash on its first query.</p></details>
+  <details class="qa"><summary>Which data would <code class="inline">docker compose down -v</code> destroy on the VM, and which would it leave?</summary><p>Destroy: the Postgres database and Redis (named volumes). Leave: uploads, sessions, presentations, backups and the other bind-mounted folders under <code class="inline">data/</code>, which are ordinary folders on the VM's disk.</p></details>
+</section>
+
+<!-- ===================================================== 05 NGINX ===== -->
+<section class="sec" id="nginx" data-title="nginx">
+  <p class="eyebrow">Section 05</p>
+  <h1><span class="sec-num">05 · THE FRONT DOOR</span>nginx: the reverse proxy</h1>
+  <p class="lede">Every request to the platform, from a browser or from another agent platform, lands on nginx first. It holds the HTTPS certificate, decides whether the caller may come in at all, and forwards the request to the right container. Understanding it is understanding most of the network and security story.</p>
+
+  <h2>What a reverse proxy is</h2>
+  <p>A <em>proxy</em> sits between a client and a server and forwards traffic. A <em>reverse</em> proxy sits in front of your servers and faces the world: clients talk to it and never to the servers behind it. Four things you get from that one extra hop:</p>
+  <ul>
+    <li><strong>TLS termination</strong>: the proxy speaks HTTPS to the outside and plain HTTP to the containers. Your Python code never touches a certificate.</li>
+    <li><strong>Routing</strong>: one hostname, one port 443, many services behind it, chosen by path (<code class="inline">/api/</code> to the backend, <code class="inline">/mcp</code> to the MCP server).</li>
+    <li><strong>Load balancing and resilience</strong>: two backend replicas behind one name; if one refuses a connection the proxy tries the other.</li>
+    <li><strong>Policy at the edge</strong>: allow-lists by source address, security headers, size limits, timeouts, before any application code runs.</li>
+  </ul>
+
+  <h2>The shape of <code class="inline">nginx-proxy.conf</code></h2>
+  <p>An nginx file is a tree of blocks. <code class="inline">http</code> holds global settings and several <code class="inline">server</code> blocks; each server block answers one hostname on one port and holds <code class="inline">location</code> blocks that match paths. This project's file (<code class="inline">infra/nginx/nginx-proxy.conf</code>) has four server blocks:</p>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Server block</th><th>Answers</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td class="k">1</td><td>Port 80, the VM's private IP</td><td>Plain HTTP for direct internal use (<code class="inline">http://172.16.126.36/</code>).</td></tr>
+      <tr><td class="k">2</td><td>Port 443, <code class="inline">chat.tccglobal.com</code> and <code class="inline">dev-chat.tccglobal.com</code></td><td>The real site, with the wildcard <code class="inline">*.tccglobal.com</code> certificate, TLS 1.2 and 1.3 only.</td></tr>
+      <tr><td class="k">3</td><td>Port 80, the same hostnames</td><td>Redirects to HTTPS (<code class="inline">return 301 https://$host$request_uri</code>).</td></tr>
+      <tr><td class="k">4</td><td>Anything else on 80 or 443</td><td><code class="inline">return 444</code>: drop the connection without answering. A request with a forged hostname gets nothing.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Where each path goes</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Path</th><th>Forwarded to</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td class="k">/ and /chat</td><td><code class="inline">backend:8000</code></td><td>The React app, served by FastAPI. No nginx auth: the app signs in with Microsoft and the Python layer checks the session.</td></tr>
+      <tr><td class="k">/api/</td><td><code class="inline">backend:8000</code></td><td>With <code class="inline">proxy_buffering off</code> and a 300 s read timeout so streamed answers (server-sent events) flow token by token.</td></tr>
+      <tr><td class="k">/api/health</td><td><code class="inline">backend:8000</code></td><td>Public, no auth: what monitors and the deploy call.</td></tr>
+      <tr><td class="k">/mcp, /.well-known/agent*.json, /health</td><td><code class="inline">mcp-server:8001</code></td><td>The agent-to-agent surface for other platforms (DevRev). Auth is done by the MCP server itself with Entra tokens.</td></tr>
+      <tr><td class="k">/api/auth/azure/, /api/files/, /api/presentations/ ...</td><td><code class="inline">backend:8000</code></td><td>Listed separately because they are opened by redirects or in new tabs, without a token header; the backend gates them.</td></tr>
+      <tr><td class="k">/deployments/chatkit/</td><td><code class="inline">backend:8000</code></td><td>The ChatKit bundle mirrored from OpenAI's CDN; the one path allowed to be framed by the app's own page.</td></tr>
+    </tbody>
+  </table></div>
+  <pre class="code"><span class="c"># a location block in its simplest form</span>
+location /api/ {
+    set $backend_upstream http://backend:8000;   <span class="c"># a variable, so the name is resolved at request time</span>
+    proxy_pass $backend_upstream;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;      <span class="c"># tell the app who really called</span>
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_http_version 1.1;
+    proxy_buffering off;                          <span class="c"># streaming</span>
+    proxy_read_timeout 300s;
+}</pre>
+
+  <h2>The fence inside the door: who may ask at all</h2>
+  <p>Before any route is chosen, two <code class="inline">geo</code> tables classify the caller by IP address, and a <code class="inline">map</code> decides whether the request is allowed on the public side:</p>
+  <pre class="code">geo $internal_client {              <span class="c"># 1 if the caller is on the TCC network</span>
+    default        0;
+    10.0.0.0/8     1;
+    172.16.0.0/12  1;
+    192.168.0.0/16 1;
+}
+geo $devrev_client {                <span class="c"># 1 if the caller is DevRev's agent runtime</span>
+    default          0;
+    52.29.103.225/32 1;
+}
+<span class="c"># internal callers: everything. DevRev: only /mcp, the agent cards, /api/a2a/*, GET /api/files/*.</span>
+<span class="c"># anyone else: 404 before a location is even chosen.</span>
+if ($edge_ok = 0) { return 404; }</pre>
+  <p>This is <strong>default deny</strong>: a new backend route stays closed to the outside until someone lists it. The comments in the file record the day DevRev's egress addresses were measured and why only one is listed. That is good engineering writing: the config explains the decision, not just the setting.</p>
+
+  <h2>How nginx finds two replicas without being told</h2>
+  <pre class="code">resolver 127.0.0.11 valid=10s ipv6=off;   <span class="c"># Docker's DNS, re-asked every 10 s</span>
+proxy_connect_timeout 2s;                  <span class="c"># a replica that just left: give up fast, try the next</span></pre>
+  <p><code class="inline">127.0.0.11</code> is Docker's internal DNS server. Asking it for <code class="inline">backend</code> returns every running replica's address. Because nginx re-asks every ten seconds, a deploy can start new replicas and retire old ones and nginx simply follows. This single setting is what makes zero-downtime deploys (section 10) possible without any load balancer.</p>
+
+  <h2>Security headers and limits</h2>
+  <p>Every response from the HTTPS server carries headers that tell browsers how to behave: <code class="inline">Strict-Transport-Security</code> (always use HTTPS for a year), <code class="inline">X-Frame-Options: DENY</code> and <code class="inline">Content-Security-Policy: frame-ancestors 'none'</code> (nobody may embed the site in an iframe), <code class="inline">X-Content-Type-Options: nosniff</code>, <code class="inline">Referrer-Policy</code>, <code class="inline">Permissions-Policy</code>. Plus <code class="inline">client_max_body_size 50m</code> so uploads work and anything bigger is refused at the door.</p>
+
+  <h2>Certificates</h2>
+  <p>HTTPS needs a certificate that proves the server is who it says. Here it is the company's wildcard certificate for <code class="inline">*.tccglobal.com</code>, two files (<code class="inline">.pem</code> public part, <code class="inline">.key</code> private part) placed by hand in <code class="inline">certs/</code> on each VM, git-ignored, mode 600, and mounted read-only into the nginx container. The watchdog warns 21 days before it expires. For your own project you will not have a corporate wildcard; section 13 uses Let's Encrypt, which issues free certificates automatically.</p>
+
+  <div class="box app">
+    <span class="label">In this project: the config is a mounted folder, not a baked file</span>
+    <p>Compose mounts <code class="inline">./infra/nginx</code> as a folder into the container. A deploy's <code class="inline">git reset</code> replaces the file in that folder, nginx tests the new config (<code class="inline">nginx -t</code>), and only if the file's hash changed does it reload (<code class="inline">nginx -s reload</code>). The container itself is not recreated, which matters because a reload can drop one connection in about 700 that is mid-handshake, so the deploy avoids reloading when nothing changed.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: the address nginx sees</span>
+    <p>The allow-lists use <code class="inline">$remote_addr</code>, the address of whoever connected to nginx. That is correct only while nginx is the edge. Put a load balancer or a CDN in front and every request arrives from the load balancer's address: the lists would admit everyone or no one. The file says so in a comment, because the person who adds a load balancer in two years needs to read it.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>What does "TLS termination" mean, and why is it convenient?</summary><p>nginx decrypts HTTPS and talks plain HTTP to the containers on the private network. The application code never handles certificates, and one certificate serves every service behind the proxy.</p></details>
+  <details class="qa"><summary>A request arrives on 443 with the hostname <code class="inline">evil.example.com</code> pointed at the VM's IP. What happens?</summary><p>No server block has that <code class="inline">server_name</code>, so the default server for 443 answers: <code class="inline">return 444</code>, which closes the connection without a response.</p></details>
+  <details class="qa"><summary>Why can a deploy add and remove backend containers without editing the nginx config?</summary><p>The config names the service (<code class="inline">backend</code>), not addresses, and re-resolves the name through Docker's DNS every 10 s. New replicas appear in the answer; stopped ones disappear, and a 2 s connect timeout skips one that just left.</p></details>
+</section>
+
+<!-- ===================================================== 06 NETWORK ===== -->
+<section class="sec" id="network" data-title="Networks and firewalls">
+  <p class="eyebrow">Section 06</p>
+  <h1><span class="sec-num">06 · NETWORK</span>Networks, firewalls and VPNs</h1>
+  <p class="lede">Most of networking is vocabulary. Once you can say what an IP address, a port, a subnet and a security group are, the whole path from a browser to the database becomes a short list of checkpoints.</p>
+
+  <h2>Seven words</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Word</th><th>Analogy</th><th>Here</th></tr></thead>
+    <tbody>
+      <tr><td class="k">IP address</td><td>A house number.</td><td>The prod VM: private <code class="inline">172.16.26.36</code>, public <code class="inline">128.251.224.255</code>.</td></tr>
+      <tr><td class="k">Port</td><td>A door in the house. 443 is the HTTPS door, 22 the SSH door, 5432 Postgres.</td><td>nginx opens 80 and 443. Postgres's 5432 is open only to the house itself.</td></tr>
+      <tr><td class="k">DNS</td><td>The phone book: name to number.</td><td><code class="inline">chat.tccglobal.com</code> resolves to the private IP on the company's DNS and to the public IP on the internet's.</td></tr>
+      <tr><td class="k">Private vs public IP</td><td>A number that only works inside the estate, versus one that works from anywhere.</td><td><code class="inline">172.16.x.x</code> and <code class="inline">10.x.x.x</code> are private ranges; nobody on the internet can route to them.</td></tr>
+      <tr><td class="k">Virtual network and subnet</td><td>A gated estate (the VNet) and a street in it (the subnet). Houses on the estate reach each other by private number.</td><td>IT owns the VNet. The VM's NIC is plugged into a subnet IT provides, which also reaches the warehouse SQL server.</td></tr>
+      <tr><td class="k">VPN</td><td>A tunnel from your laptop into the estate, so your laptop behaves as if it lived there.</td><td>From home, the TCC VPN is how you reach <code class="inline">172.16.126.36</code> and the dev site.</td></tr>
+      <tr><td class="k">Network security group (NSG)</td><td>The estate's fence with numbered gates: each rule says who may come in, through which door.</td><td>Three allow rules on the prod VM; everything else is dropped by the default deny.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The journey of one request</h2>
+  <div class="diagram">
+    <svg viewBox="0 0 780 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Browser to DNS to NSG to nginx to backend to postgres">
+      <defs>
+        <marker id="arrC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="d-arrow"/></marker>
+      </defs>
+      <rect x="6" y="40" width="110" height="56" rx="8" class="d-box"/>
+      <text x="61" y="64" text-anchor="middle" class="d-text">Browser</text>
+      <text x="61" y="82" text-anchor="middle" class="d-text mono">chat.tccglobal.com</text>
+
+      <rect x="140" y="40" width="100" height="56" rx="8" class="d-box"/>
+      <text x="190" y="64" text-anchor="middle" class="d-text">DNS</text>
+      <text x="190" y="82" text-anchor="middle" class="d-text mono">→ 172.16.26.36</text>
+
+      <rect x="264" y="40" width="110" height="56" rx="8" class="d-box warm"/>
+      <text x="319" y="64" text-anchor="middle" class="d-text">NSG</text>
+      <text x="319" y="82" text-anchor="middle" class="d-text mono">443 from TCC? ok</text>
+
+      <rect x="398" y="40" width="110" height="56" rx="8" class="d-box warm"/>
+      <text x="453" y="64" text-anchor="middle" class="d-text">nginx :443</text>
+      <text x="453" y="82" text-anchor="middle" class="d-text mono">TLS · edge rules</text>
+
+      <rect x="532" y="40" width="110" height="56" rx="8" class="d-box hi"/>
+      <text x="587" y="64" text-anchor="middle" class="d-text">backend</text>
+      <text x="587" y="82" text-anchor="middle" class="d-text mono">:8000 · session?</text>
+
+      <rect x="666" y="40" width="108" height="56" rx="8" class="d-box"/>
+      <text x="720" y="64" text-anchor="middle" class="d-text">postgres</text>
+      <text x="720" y="82" text-anchor="middle" class="d-text mono">:5432</text>
+
+      <line x1="116" y1="68" x2="138" y2="68" class="d-line" marker-end="url(#arrC)"/>
+      <line x1="240" y1="68" x2="262" y2="68" class="d-line" marker-end="url(#arrC)"/>
+      <line x1="374" y1="68" x2="396" y2="68" class="d-line" marker-end="url(#arrC)"/>
+      <line x1="508" y1="68" x2="530" y2="68" class="d-line" marker-end="url(#arrC)"/>
+      <line x1="642" y1="68" x2="664" y2="68" class="d-line" marker-end="url(#arrC)"/>
+
+      <line x1="6" y1="120" x2="380" y2="120" class="d-line"/>
+      <text x="193" y="140" text-anchor="middle" class="d-text sm">company network or VPN, then Azure's fence</text>
+      <line x1="398" y1="120" x2="774" y2="120" class="d-line hi"/>
+      <text x="586" y="140" text-anchor="middle" class="d-text sm">inside the VM: the Docker network, never leaves the machine</text>
+    </svg>
+    <p class="cap">Three checkpoints, each owned by a different layer: Azure (NSG), nginx (edge rules), the application (session or token). Each assumes the one before it might be misconfigured.</p>
+  </div>
+  <ol class="steps">
+    <li>The browser asks DNS for <code class="inline">chat.tccglobal.com</code>. On the company network it gets the private IP; from the internet it gets the public one.</li>
+    <li>The packet reaches Azure. The NSG attached to the VM's network card checks: source address, destination port 443, protocol TCP. A rule matches (TCC ranges, or DevRev's single address) or the default <em>DenyAllInBound</em> drops it silently. A blocked caller sees a timeout, not an error page.</li>
+    <li>nginx accepts the TCP connection on 443, completes the TLS handshake with the wildcard certificate, and runs the edge rules from section 05: internal caller, DevRev on an allowed path, or 404.</li>
+    <li>nginx forwards to <code class="inline">backend:8000</code> over the Docker bridge network. The backend's Python middleware checks the session token.</li>
+    <li>The backend talks to <code class="inline">postgres:5432</code> on the same private network, and to Azure services over outbound HTTPS.</li>
+    <li>The answer streams back the same way, through nginx, with the security headers added.</li>
+  </ol>
+
+  <h2>The prod VM's fence, rule by rule</h2>
+  <p>From <code class="inline">infra/app-vm/main.bicep</code>. Lower priority number wins; anything no rule allows is denied.</p>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Priority</th><th>Rule</th><th>From</th><th>To port</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td class="k">1090</td><td>Internal-SSH-HTTP-HTTPS</td><td><code class="inline">10.0.0.0/8</code>, <code class="inline">172.16.0.0/16</code> (TCC network and VPN)</td><td>22, 80, 443</td><td>People and admins inside the company.</td></tr>
+      <tr><td class="k">1110</td><td>DR_Connector-443</td><td><code class="inline">52.29.103.225/32</code> (DevRev's agent runtime)</td><td>443</td><td>The one outside caller, HTTPS only.</td></tr>
+      <tr><td class="k">1120</td><td>Allow-DSQL</td><td><code class="inline">172.16.11.5</code> (the on-prem SQL server)</td><td>any</td><td>A callback from the warehouse host.</td></tr>
+      <tr><td class="k">65500</td><td>DenyAllInBound (Azure default)</td><td>anyone</td><td>any</td><td>Everything not listed above.</td></tr>
+    </tbody>
+  </table></div>
+  <p>There is no rule whose source is <code class="inline">Internet</code>. The VM has a public IP, but the only thing the internet can do with it is be DevRev on port 443. Port 5432 is doubly closed: no NSG rule, and Postgres listens on <code class="inline">127.0.0.1</code> only.</p>
+
+  <h2>Three nested fences</h2>
+  <div class="cards">
+    <div class="card"><span class="tag">Azure</span><h3>NSG</h3><p>By source address and port, before a packet touches the VM. Cheap, dumb, and the only layer that works when nginx is misconfigured.</p></div>
+    <div class="card"><span class="tag">VM</span><h3>nginx edge rules</h3><p>By source address and <em>path</em>. Knows that DevRev may call <code class="inline">/mcp</code> but not <code class="inline">/chat</code>.</p></div>
+    <div class="card"><span class="tag">App</span><h3>Session or token</h3><p>By identity. Knows <em>who</em> is calling and which agents they may use. The only layer that can make per-person decisions.</p></div>
+  </div>
+
+  <h2>Outbound: what the VM must be able to reach</h2>
+  <p>Inbound rules get all the attention, but the VM also makes calls: Azure AI Foundry for every model answer, Azure ML endpoints for predictions, Azure SQL for the warehouse, Key Vault for secrets, Blob Storage, Application Insights for traces, OpenAI's CDN for the ChatKit mirror, DevRev's API, and the git server during a deploy. Each needs outbound HTTPS. Key Vault adds a twist: its own firewall admits only the VM's subnet, so the same vault refuses your laptop even when you are signed in with the right account.</p>
+
+  <div class="box app">
+    <span class="label">In this project: names and addresses</span>
+    <div class="tw"><table class="t">
+      <thead><tr><th>Name</th><th>Resolves to</th><th>Reachable from</th></tr></thead>
+      <tbody>
+        <tr><td class="k">dev-chat.tccglobal.com</td><td><code class="inline">172.16.126.36</code> (internal DNS only)</td><td>TCC network and VPN</td></tr>
+        <tr><td class="k">chat.tccglobal.com</td><td><code class="inline">172.16.26.36</code> internally, <code class="inline">128.251.224.255</code> publicly</td><td>TCC network and VPN; DevRev on 443</td></tr>
+        <tr><td class="k">tcc-mcp-prd.westeurope.cloudapp.azure.com</td><td>The prod public IP (Azure's own DNS label)</td><td>Used to test prod before DNS was switched, with <code class="inline">curl --resolve</code></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: locking yourself out</span>
+    <p><code class="inline">infra/app-vm/README.md</code> says it plainly: create the new internal SSH rule <em>before</em> deleting the old broad one, or you lock yourself out of the VM. Firewall changes are the one place where order of operations is not a style question. Always add, verify, then remove.</p>
+  </div>
+  <div class="box warn">
+    <span class="label">Pitfall: the split-tunnel VPN</span>
+    <p>The TCC VPN sends only <code class="inline">10.x</code> traffic through the tunnel. Your laptop still reaches Azure from your home IP, so Key Vault refuses it with <code class="inline">ForbiddenByFirewall</code> and the backend falls back to <code class="inline">.env</code>. When a secret "works on the VM but not on my laptop", this is usually why.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why does the dev VM have a public IP at all if the site is internal?</summary><p>DevRev's agent platform calls the dev instance's A2A and MCP endpoints from the internet. The NSG admits only DevRev's address, only on 443, and nginx then admits only the A2A and MCP paths.</p></details>
+  <details class="qa"><summary>Someone on the internet scans the prod public IP on port 5432. Name the two things that stop them.</summary><p>The NSG has no rule allowing 5432 from anywhere, so the packet is dropped before the VM. And Postgres is published on <code class="inline">127.0.0.1</code> only, so even on the VM it answers only to local processes.</p></details>
+  <details class="qa"><summary>What is the difference between a VNet and a VPN?</summary><p>A VNet is the private network inside Azure where the VM's private address lives. A VPN is a tunnel that puts a remote laptop inside that private network so it can use those addresses. One is a place, the other is a road into it.</p></details>
+</section>
+
+<!-- ===================================================== 07 SECURITY ===== -->
+<section class="sec" id="security" data-title="Security">
+  <p class="eyebrow">Section 07</p>
+  <h1><span class="sec-num">07 · SECURITY</span>Layers, identities and secrets</h1>
+  <p class="lede">Security is not one feature; it is a habit applied at every layer. This section names the habits (defence in depth, least privilege, no secrets in git, fail closed, know who did what) and shows where each one lives in this platform.</p>
+
+  <h2>Five habits</h2>
+  <ul>
+    <li><strong>Defence in depth</strong>: several independent fences, so one mistake is not a breach. The NSG, nginx and the application each check on their own.</li>
+    <li><strong>Least privilege</strong>: every process and person gets the minimum. Containers run as an unprivileged user; a signed-in person sees only the agents and warehouse rows granted to them; the default for an unknown person is <em>no agents</em>.</li>
+    <li><strong>No secrets in git</strong>: <code class="inline">.env</code> and <code class="inline">certs/</code> are ignored; a pre-commit hook refuses commits containing private keys; CI sets <code class="inline">KV_DISABLED=1</code> so a test run can never read the real vault.</li>
+    <li><strong>Fail closed</strong>: when a check cannot be made, refuse. A person whose warehouse token cannot be renewed is refused rather than silently promoted to the service identity.</li>
+    <li><strong>Audit</strong>: requests are logged with address, path, status and latency; warehouse reads run as the person so the database audit names them; every change made through the ops tool is written to an audit table with the caller's name.</li>
+  </ul>
+
+  <h2>Authentication versus authorization</h2>
+  <p>Two words that beginners merge. <strong>Authentication</strong> answers "who are you?"; <strong>authorization</strong> answers "what may you do?". On the <code class="inline">/mcp</code> endpoint: a valid Entra token proves who is calling (authentication); the token's group claims are mapped to a role in <code class="inline">auth/group_roles.json</code>, and <code class="inline">auth/skill_roles.json</code> says which role may consult which agent (authorization). Anyone in the company tenant can authenticate; most are then refused with <code class="inline">403 no_role</code>. Authenticated is not the same as allowed.</p>
+
+  <h2>The layers, with this project's implementation</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Layer</th><th>Control</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Network</td><td>NSG with three allow rules, private IPs, VPN for people.</td><td><code class="inline">infra/app-vm/main.bicep</code></td></tr>
+      <tr><td class="k">Edge</td><td>TLS 1.2+, default-deny paths for outside callers, security headers, body size limit, unknown hostnames dropped.</td><td><code class="inline">infra/nginx/nginx-proxy.conf</code></td></tr>
+      <tr><td class="k">People</td><td>Microsoft Entra sign-in (SSO); a session token valid 7 days, signed with a dedicated secret from Key Vault.</td><td><code class="inline">src/auth/</code></td></tr>
+      <tr><td class="k">Machines</td><td>Entra bearer tokens on <code class="inline">/mcp</code>: signature checked against the tenant's public keys, audience and issuer checked, role from groups.</td><td><code class="inline">src/a2a_auth/</code>, <code class="inline">auth/*.json</code></td></tr>
+      <tr><td class="k">Per-person access</td><td>Which agents a person may use, from named groups in <code class="inline">config.yaml</code>; default none; some agents and models can be restricted further.</td><td><code class="inline">config.yaml access_control</code>, <code class="inline">src/auth/access_policy.py</code></td></tr>
+      <tr><td class="k">Data as the person</td><td>Warehouse reads use the signed-in person's own token (an on-behalf-of exchange), so the database enforces their rights and its audit names them.</td><td><code class="inline">src/auth/dwh_token.py</code></td></tr>
+      <tr><td class="k">Secrets</td><td>Key Vault, read with the VM's managed identity; <code class="inline">.env</code> only as a fallback; nothing in git.</td><td><code class="inline">src/config.py</code></td></tr>
+      <tr><td class="k">Containers</td><td>Non-root (uid 1000), minimal base image, multi-stage build, read-only mounts where possible, no container holds the Docker socket.</td><td><code class="inline">backend.Dockerfile</code>, <code class="inline">docker-compose.yml</code></td></tr>
+      <tr><td class="k">Watching</td><td>Request logs, traces in Application Insights, an audit table for operations.</td><td>Section 11</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Managed identity: a badge instead of a password</h2>
+  <p>The classic way to let a server read a vault is to give it a password, which then has to be stored somewhere on the server, which is the problem you were trying to solve. Azure's answer is the <strong>managed identity</strong>: the VM has an identity of its own in Entra (<code class="inline">AZ-DEV-SV-MCP-ID-01</code>, <code class="inline">AZ-PRD-SV-MCP-ID-01</code>). Azure services grant rights to that identity (Key Vault: <em>Secrets User</em>; Blob Storage: <em>Blob Data Reader</em>; Azure SQL: a database user). When the app needs a token it asks a local Azure endpoint, which knows which VM is asking. No password exists anywhere. The code in <code class="inline">src/config.py</code> tries the managed identity first, then falls back to whatever <code class="inline">az login</code> provided on a laptop, then to <code class="inline">.env</code>.</p>
+
+  <h2>Where the secrets live</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Secret</th><th>Lives in</th><th>Fallback</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Sign-in app secret (Entra)</td><td>That VM's Key Vault</td><td><code class="inline">.env</code></td></tr>
+      <tr><td class="k">Model key (AI Foundry)</td><td>That VM's Key Vault, written there by <code class="inline">infra/foundry/deploy.sh</code></td><td><code class="inline">.env</code></td></tr>
+      <tr><td class="k">MCP API key, session-token signing key</td><td>Key Vault</td><td><code class="inline">.env</code></td></tr>
+      <tr><td class="k">Application Insights connection string</td><td>Key Vault</td><td><code class="inline">.env</code></td></tr>
+      <tr><td class="k">reCAST endpoint keys</td><td>Key Vault</td><td><code class="inline">.env</code></td></tr>
+      <tr><td class="k">Azure ML endpoint keys, warehouse SQL password, Blob key</td><td><code class="inline">.env</code> on the VM</td><td>(not yet in Key Vault)</td></tr>
+      <tr><td class="k">Postgres password</td><td><code class="inline">docker-compose.yml</code>, in plain text</td><td>Acceptable only because 5432 is localhost-only; it would be a bug if the port were published.</td></tr>
+      <tr><td class="k">People's connector tokens (DevRev, MCP connectors)</td><td>Postgres, encrypted at rest with a key derived from the MCP key</td><td></td></tr>
+    </tbody>
+  </table></div>
+  <p>The honest picture is a migration in progress: the important keys moved to Key Vault; a few older ones still sit in the VM's <code class="inline">.env</code>. The wiki's Security page lists them so nobody mistakes "it is in .env" for "it is secure".</p>
+
+  <h2>HTTPS, in two sentences</h2>
+  <p>TLS encrypts the connection so nobody between the browser and nginx can read or change it, and the certificate proves the server is really <code class="inline">chat.tccglobal.com</code>. nginx refuses TLS 1.0 and 1.1 (old, broken) and tells browsers via HSTS to never try plain HTTP again.</p>
+
+  <h2>Known gaps, stated honestly</h2>
+  <ul>
+    <li>CORS is <code class="inline">allow_origins=["*"]</code>, so any website could call the API (with the user's own token, not without it).</li>
+    <li>The <code class="inline">MCP_RATE_LIMIT</code> variable in the compose file is not read by the code; rate limiting exists in <code class="inline">src/api/rate_limit.py</code>, keyed on the real client address, but that variable is dead.</li>
+    <li>Pull requests are not validated by CI before merge (section 09), so the pre-commit hooks are the only check before code lands on <code class="inline">dev</code>.</li>
+    <li>Model-written transform scripts run inside the backend process with restricted builtins: a guard, not a sandbox. Isolating them in their own container is an open item.</li>
+  </ul>
+  <p>A security page that lists its own gaps is worth more than one that claims perfection. Keep that habit in your own projects.</p>
+
+  <div class="box app">
+    <span class="label">In this project: why "fail closed" was learned the hard way</span>
+    <p>The warehouse client used to fall back to the VM's service identity when a person's token was missing on one of the two backend replicas. Result: that person briefly saw <em>every</em> client's data with the service identity's rights. The fix was to refuse instead, and to offer a one-click reconnect in the UI. A silent fallback that "makes it work" is often a security bug wearing a helpful face.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfalls beginners make, all seen in the wild</span>
+    <ul>
+      <li>A token in the URL (<code class="inline">?api_key=...</code>): it lands in every access log. The old middleware accepted that; the new one does not.</li>
+      <li>Default allow: giving every signed-in person one agent "so the page is not empty". This platform's default is now no agents and a request-access page.</li>
+      <li>Committing <code class="inline">.env</code> once. Git never forgets; the secret must be rotated, not just deleted.</li>
+      <li>Running containers as root because the tutorial did.</li>
+    </ul>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Explain authentication versus authorization using the <code class="inline">/mcp</code> endpoint.</summary><p>Authentication: the Entra token's signature, audience and issuer are verified, so the server knows which account is calling. Authorization: the token's groups map to a role, and the role must be allowed for the requested agent. A valid token with no mapped group is authenticated but refused.</p></details>
+  <details class="qa"><summary>Why is a managed identity safer than a key in <code class="inline">.env</code>?</summary><p>There is nothing to steal from disk and nothing to rotate: Azure issues short-lived tokens to the VM because it knows which VM is asking. A key in a file can be copied, leaked into a log, or committed.</p></details>
+  <details class="qa"><summary>Why does the Postgres password in <code class="inline">docker-compose.yml</code> not matter today, and when would it?</summary><p>Postgres listens on <code class="inline">127.0.0.1</code> only and nothing outside the VM can reach it, so the password protects against nothing the network does not already stop. It would matter the moment the port were published on all interfaces or Postgres moved to a managed service.</p></details>
+</section>
+
+<!-- ===================================================== 08 ENVS ===== -->
+<section class="sec" id="envs" data-title="Environments and configuration">
+  <p class="eyebrow">Section 08</p>
+  <h1><span class="sec-num">08 · CONFIGURATION</span>Environments and configuration</h1>
+  <p class="lede">"Local, dev, prod" is the simplest promotion ladder there is: your laptop, a test copy that real colleagues use, and the real thing. The discipline that makes it work is one rule about where settings live.</p>
+
+  <h2>Why three environments</h2>
+  <div class="cards">
+    <div class="card"><span class="tag">local</span><h3>Fast and forgiving</h3><p>Hot reload, no login, Key Vault unreachable so secrets come from <code class="inline">.env</code>. Break it as often as you like.</p></div>
+    <div class="card"><span class="tag">dev</span><h3>Real, but not for customers</h3><p>Same containers, same sign-in, same warehouse as prod. Where testers try a feature before it is released. Deployed on every merge to <code class="inline">dev</code>.</p></div>
+    <div class="card"><span class="tag">prod</span><h3>The real thing</h3><p>Deployed on every merge to <code class="inline">main</code>. A release is a reviewed pull request from <code class="inline">dev</code> to <code class="inline">main</code>; rollback is reverting it.</p></div>
+  </div>
+  <p>The value of dev is that a mistake is found by a colleague on a test site, not by a project manager during a client call. The cost is a second VM and the discipline to keep both identical except for what must differ.</p>
+
+  <h2>The one rule</h2>
+  <div class="box idea">
+    <span class="label">From the project's CLAUDE.md</span>
+    <p><code class="inline">APP_ENV</code> (<code class="inline">local</code> | <code class="inline">dev</code> | <code class="inline">prod</code>) is the <strong>only</strong> setting that differs per environment in <code class="inline">.env</code>; everything else in <code class="inline">.env</code> is a secret. Non-secret settings live in <code class="inline">config.yaml</code>, and a value that differs per environment goes under <code class="inline">environments.&lt;env&gt;</code> there, never in <code class="inline">.env</code>.</p>
+  </div>
+  <p>Why so strict? Because <code class="inline">.env</code> is invisible: git-ignored, different on every machine, never reviewed. If a setting lives there, nobody can see in a pull request that dev and prod differ. Keeping every non-secret in <code class="inline">config.yaml</code> means the difference between environments is a reviewable diff in the repo:</p>
+  <pre class="code"><span class="c"># config.yaml, sketched</span>
+keyvault:
+  url: https://AZ-DEV-SV-MCP-KV-01.vault.azure.net/
+environments:
+  prod:
+    keyvault:
+      url: https://AZ-PRD-SV-MCP-KV-01.vault.azure.net/
+    azure_ad:
+      redirect_uri: https://chat.tccglobal.com/api/auth/azure/callback
+    <span class="c"># ... the prod identity, sign-in app, model resource</span></pre>
+  <p><code class="inline">src/config.py</code> reads <code class="inline">APP_ENV</code> and merges that block over the defaults. One switch, one place.</p>
+
+  <h2>How a secret is resolved</h2>
+  <ol class="steps">
+    <li>Key Vault, if <code class="inline">keyvault.url</code> is set and <code class="inline">KV_DISABLED</code> is not. First with the VM's managed identity, then with whatever <code class="inline">az login</code> provides on a laptop.</li>
+    <li>The environment variable from <code class="inline">.env</code>.</li>
+    <li>The default in <code class="inline">config.yaml</code>, if there is one.</li>
+  </ol>
+  <p>On a laptop, step 1 usually fails politely (the vault's firewall refuses your home address) and step 2 wins. <code class="inline">scripts/fetch_env.ps1</code> fills a laptop's <code class="inline">.env</code> from the vault when you are on the office network. A secret that falls back from vault to <code class="inline">.env</code> on a VM is reported as a degraded mode, so it shows in the admin console rather than being forgotten.</p>
+
+  <h2>What differs between the two VMs</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th></th><th>Dev</th><th>Prod</th><th>Chosen by</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Branch</td><td><code class="inline">dev</code></td><td><code class="inline">main</code></td><td><code class="inline">azure-pipelines.yml</code></td></tr>
+      <tr><td class="k">Hostname, IPs</td><td>dev-chat, 172.16.126.36</td><td>chat, 172.16.26.36</td><td>DNS (IT), <code class="inline">nginx-proxy.conf</code> names both</td></tr>
+      <tr><td class="k">Key Vault, identity, sign-in app</td><td>the dev set</td><td>the prod set</td><td><code class="inline">environments.prod</code> in <code class="inline">config.yaml</code></td></tr>
+      <tr><td class="k">Model resource, App Insights</td><td><code class="inline">az-dev-sv-mcp-foundry-01</code></td><td><code class="inline">az-prd-sv-mcp-foundry-01</code></td><td>same block</td></tr>
+      <tr><td class="k">Everything else</td><td colspan="2">identical: code, compose file, nginx file, model list, prices</td><td></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The twelve-factor idea, in one paragraph</h2>
+  <p>A well-known checklist for web apps ("The Twelve-Factor App") says: keep config in the environment, not in code; build once and run the same build everywhere; treat backing services (database, cache, model API) as attached resources named by a URL. This project follows the spirit: one image, config by <code class="inline">APP_ENV</code>, backing services by URL. It bends one rule: the image is rebuilt on each VM rather than built once and shipped, which is simpler but means a build can differ by a dependency that moved between the two builds. The lock file is what keeps that from happening.</p>
+
+  <div class="box app">
+    <span class="label">In this project: the default that bites</span>
+    <p><code class="inline">APP_ENV</code> defaults to <code class="inline">prod</code>. A dev VM whose <code class="inline">.env</code> lacks the line would quietly read <em>prod's</em> vault and sign people in with prod's app. The wiki's Deployment page says to set it before the first deploy. Defaults should be the safe choice; here the safe choice was "behave like prod" for the running site, at the cost of this trap for a new VM. Know the trade-off you are making when you pick a default.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: personal overrides</span>
+    <p>If only your laptop needs a different model endpoint, it belongs in the git-ignored <code class="inline">config.local.yaml</code> (there is an example file), which is merged only when <code class="inline">APP_ENV=local</code>. Never in <code class="inline">config.yaml</code>, which ships to prod, and never in <code class="inline">.env</code>, which is for secrets.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>A colleague adds <code class="inline">FOUNDRY_ENDPOINT=https://...</code> to the VM's <code class="inline">.env</code> because prod needs a different one. What is wrong with that?</summary><p>It is not a secret, so it does not belong in <code class="inline">.env</code>; the difference is now invisible to reviewers and will be lost when the VM is rebuilt. It belongs under <code class="inline">environments.prod</code> in <code class="inline">config.yaml</code>.</p></details>
+  <details class="qa"><summary>Why does the same secret work on the VM but not on your laptop, even though you ran <code class="inline">az login</code>?</summary><p>Key Vault's firewall admits only the VM's subnet and the office addresses; from home through the split-tunnel VPN your traffic still leaves from your home IP. The laptop falls back to <code class="inline">.env</code>, which may not have that key yet.</p></details>
+  <details class="qa"><summary>What is a release in this project, mechanically?</summary><p>A pull request merging <code class="inline">dev</code> into <code class="inline">main</code>. The pipeline then deploys <code class="inline">main</code> to the prod VM. Rolling back is reverting that merge; the data is untouched.</p></details>
+</section>
+
+<!-- ===================================================== 09 CI ===== -->
+<section class="sec" id="ci" data-title="CI">
+  <p class="eyebrow">Section 09</p>
+  <h1><span class="sec-num">09 · DELIVERY</span>CI: the checks on every merge</h1>
+  <p class="lede">Continuous integration means: every time code lands on a shared branch, a fresh computer somewhere runs the checks, so that "it passed on my laptop" stops being the standard. The pipeline is nothing more than your pre-PR commands written down in YAML.</p>
+
+  <h2>Vocabulary</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Word</th><th>Meaning</th><th>Here</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Pipeline</td><td>The whole YAML file; one <em>run</em> each time it triggers.</td><td><code class="inline">azure-pipelines.yml</code></td></tr>
+      <tr><td class="k">Trigger</td><td>What starts a run.</td><td>A push (merge) to <code class="inline">main</code> or <code class="inline">dev</code>.</td></tr>
+      <tr><td class="k">Stage</td><td>A phase of the run; stages run in order and can depend on each other.</td><td><code class="inline">CI</code>, then <code class="inline">DeployDev</code> or <code class="inline">DeployProd</code>.</td></tr>
+      <tr><td class="k">Job</td><td>A unit of work inside a stage, run on one machine; jobs in a stage run in parallel.</td><td>Four CI jobs: Python checks, Python tests, frontend build, Docker build.</td></tr>
+      <tr><td class="k">Step</td><td>One command or task inside a job.</td><td><code class="inline">ruff check src/ tests/</code></td></tr>
+      <tr><td class="k">Agent</td><td>The machine that runs a job. <em>Hosted</em>: a throwaway VM from Microsoft. <em>Self-hosted</em>: your own machine with the agent software installed.</td><td>CI on hosted <code class="inline">ubuntu-latest</code>; deploy on the VM's own agent (section 10).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Read the real pipeline</h2>
+  <pre class="code">trigger:
+  batch: true              <span class="c"># merges that land while a run is busy share one next run</span>
+  branches:
+    include: [main, dev]
+
+variables:
+  pythonVersion: '3.12'
+  nodeVersion: '22'
+  pnpmVersion: 10.11.0
+
+stages:
+- stage: CI
+  displayName: Build &amp; Validate
+  jobs:
+  - job: PythonChecks                    <span class="c"># ── lint and security scan</span>
+    pool: { vmImage: ubuntu-latest }
+    steps:
+    - script: pip install ruff bandit
+    - script: ruff check src/ tests/
+    - script: ruff format --check src/ tests/
+    - script: bandit -r src/ -c pyproject.toml -ii -ll
+
+  - job: PythonTests                     <span class="c"># ── the test suite</span>
+    pool: { vmImage: ubuntu-latest }
+    variables:
+      KV_DISABLED: '1'                   <span class="c"># never let a test reach the real Key Vault</span>
+    steps:
+    - script: |
+        pip install "uv&gt;=0.12,&lt;0.13"
+        uv sync --locked --python "$(which python)"   <span class="c"># from the lock, never re-resolve</span>
+    - script: python -m pytest tests/a2a_auth/ -q     <span class="c"># the security boundary first: seconds</span>
+    - script: python -m pytest tests/ -q -m "not integration"
+
+  - job: FrontendBuild                   <span class="c"># ── does the React app still build?</span>
+    steps:
+    - script: npm install -g pnpm@$(pnpmVersion)
+    - script: cd chatkit &amp;&amp; pnpm install --frozen-lockfile &amp;&amp; pnpm build
+    - script: cd chatkit &amp;&amp; pnpm --filter campaign-forecasting-app test
+
+  - job: DockerBuild                     <span class="c"># ── does the Dockerfile still build?</span>
+    steps:
+    - script: docker build -f backend.Dockerfile -t mcp-backend:ci .</pre>
+
+  <h3>What each job is for</h3>
+  <ul>
+    <li><strong>PythonChecks</strong>: <code class="inline">ruff</code> catches style and real bugs (unused variables, bad imports); <code class="inline">ruff format --check</code> refuses unformatted code; <code class="inline">bandit</code> flags risky patterns (shell injection, hard-coded passwords).</li>
+    <li><strong>PythonTests</strong>: the hermetic tests, with the authentication tests run first and alone because they are the security boundary and they finish in seconds. Tests marked <code class="inline">integration</code> (they call the live warehouse, Azure ML or a model) are skipped here on purpose.</li>
+    <li><strong>FrontendBuild</strong>: builds the React app with the exact pnpm version pinned, and runs its unit tests.</li>
+    <li><strong>DockerBuild</strong>: builds the image and throws it away. It exists only to catch a Dockerfile that stopped building, before the VM finds out during a deploy.</li>
+  </ul>
+
+  <h2>What "hosted agent" means in practice</h2>
+  <p>Microsoft starts a clean Ubuntu VM, checks out your repo, runs your steps, uploads the logs and destroys the VM. Nothing persists; nothing of yours is installed; it cannot reach your VMs or your vault unless you give it credentials. That isolation is why <code class="inline">KV_DISABLED=1</code> matters: hosted agents <em>are</em> Azure VMs, and without the switch a stray credential could have resolved production secrets during test collection.</p>
+
+  <h2>The honest gotcha: PRs are not validated</h2>
+  <div class="box warn">
+    <span class="label">Measured, not assumed</span>
+    <p>The YAML has a <code class="inline">pr:</code> block, and it does nothing. Azure Repos ignores the YAML <code class="inline">pr</code> trigger; pull-request validation there comes from a <em>branch policy</em>, and no branch carries one. So the checks run <strong>after</strong> a merge, not before. A failing <code class="inline">ruff</code> blocks the deploy, not the merge. That is why the project's rules say to run what CI runs before opening a PR, and why pre-commit hooks exist. The comment in the YAML records the date this was measured.</p>
+  </div>
+  <p>On GitHub, which is where mini-agents lives, <code class="inline">on: pull_request</code> genuinely runs before merge, and <em>branch protection</em> can refuse the merge button until the checks pass. Section 13 sets that up.</p>
+
+  <h2>The same thing in GitHub Actions</h2>
+  <p>Different YAML, same ideas: a <em>workflow</em> is a pipeline, a <em>job</em> runs on a runner, <em>steps</em> are commands. This is what mini-agents will use:</p>
+  <pre class="code"><span class="c"># .github/workflows/ci.yml</span>
+name: ci
+on:
+  push:
+    branches: [master]
+  pull_request:                       <span class="c"># this one really does run before merge</span>
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5     <span class="c"># check the current tag on the Marketplace</span>
+    - run: uv sync --locked
+    - run: uv run ruff check .
+    - run: uv run pytest -q
+    - run: docker build -t mini-agents:ci .</pre>
+
+  <div class="box app">
+    <span class="label">In this project: what to run before you open a PR</span>
+    <pre class="code">uvx ruff@latest check src/ tests/
+uvx ruff@latest format --check src/ tests/
+uvx bandit -r src/ -c pyproject.toml -ii -ll
+pytest tests/a2a_auth/ -q
+pytest tests/ -q -m "not integration"</pre>
+    <p>That list is in <code class="inline">CLAUDE.md</code> §6, and it is the CI stage, line for line. <code class="inline">make lint-fix</code> fixes what ruff can fix; <code class="inline">make pre-commit-install</code> makes git run the checks on every commit.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why run the tests on a Microsoft VM rather than on the dev VM, which already has everything installed?</summary><p>A fresh machine proves the repo is self-contained (the lock file, the Dockerfile, the pinned tool versions). The dev VM has state, secrets and traffic; a test suite should have none of those. And four jobs run in parallel on four hosted machines, which the two-core dev VM could not do.</p></details>
+  <details class="qa"><summary>A merge to <code class="inline">dev</code> fails <code class="inline">ruff format --check</code>. What is the user-visible effect?</summary><p>None, immediately: the code is already merged. The CI stage fails, so the <code class="inline">DeployDev</code> stage does not run, and the dev site keeps serving the previous version until someone fixes the formatting and merges again.</p></details>
+  <details class="qa"><summary>Why are integration tests excluded from CI?</summary><p>They call live services (the warehouse, Azure ML endpoints, models) that cost money, need credentials the hosted agent must not have, and can fail for reasons unrelated to the code change.</p></details>
+</section>
+
+<!-- ===================================================== 10 CD ===== -->
+<section class="sec" id="cd" data-title="CD">
+  <p class="eyebrow">Section 10</p>
+  <h1><span class="sec-num">10 · DELIVERY</span>CD: how code reaches the VM</h1>
+  <p class="lede">Continuous deployment is the second half of the pipeline: once the checks pass, the same run puts the code on the machine. This project does it with a script on the VM that replaces the running containers one service at a time, without a second of downtime. It is the most sophisticated part of the platform and the one most worth understanding.</p>
+
+  <h2>Two ways to deploy to a machine</h2>
+  <ul>
+    <li><strong>Push</strong>: the pipeline runner opens an SSH connection to the VM and runs commands. Simple; the runner needs an SSH key to the server.</li>
+    <li><strong>Agent on the machine</strong>: a small program on the VM registers with the pipeline service and waits; the pipeline hands it the job. The VM needs no inbound access from the runner, and the pipeline needs no key to the VM.</li>
+  </ul>
+  <p>This project uses the second. In Azure DevOps it is called an <em>environment</em> with a <em>VirtualMachine resource</em>: an agent installed on each VM, registered to the environment named <code class="inline">dev</code> or <code class="inline">prod</code>. The deployment job then literally runs <em>on the VM</em>, in the agent's own checkout of the repo. Because that checkout is made with the pipeline's temporary job token, the VM never stores a personal access token.</p>
+  <pre class="code">- stage: DeployDev
+  dependsOn: CI
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+  jobs:
+  - deployment: DeployToVM
+    environment:
+      name: dev                    <span class="c"># the ADO environment the dev VM's agent registered with</span>
+      resourceType: VirtualMachine
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - script: |
+              chmod +x scripts/deploy.sh
+              scripts/deploy.sh      <span class="c"># runs ON the VM</span>
+
+- stage: DeployProd                <span class="c"># identical, for main → environment prod</span></pre>
+
+  <h2>What <code class="inline">deploy.sh</code> does, in order</h2>
+  <ol class="steps">
+    <li><strong>Take the code.</strong> Reset the repo at <code class="inline">/home/code/agents_and_connectors</code> to the commit the pipeline checked out; the branch comes from the pipeline (<code class="inline">BUILD_SOURCEBRANCHNAME</code>). <code class="inline">APP_VERSION</code> becomes the short commit hash, so every container can say which version it is.</li>
+    <li><strong>Tell the watchdog.</strong> Write <code class="inline">data/ops/deploy.json</code>; while a deploy runs, and for two minutes after, failures are recorded but open no incident, so a deploy does not page anyone.</li>
+    <li><strong>Prepare the folders.</strong> Create every bind-mounted <code class="inline">data/*</code> folder and give it to uid 1000 (the container user) with the admin's group. This is the fix for the "Docker created it as root" pitfall from section 03.</li>
+    <li><strong>Build the images</strong> while the old containers keep serving. About six minutes.</li>
+    <li><strong>Back up the database</strong>: a <code class="inline">pg_dump</code> into <code class="inline">data/backups</code>, keeping the last ten. If this fails, nothing has been stopped yet.</li>
+    <li><strong>Refresh the host timers</strong> (section 11) if their unit files changed.</li>
+    <li><strong>One-time migrations</strong> (the Postgres 15 to 18 move), harmless once done; then <code class="inline">up -d</code> for Postgres and Redis only, which recreates them only if their own definition changed.</li>
+    <li><strong>Roll out the backend</strong>, then the MCP server, with <code class="inline">rollout.sh</code> (below). This is the no-downtime part.</li>
+    <li><strong>Drain and replace the worker</strong>: it gets up to 150 s to finish the upload it is parsing; queued uploads simply wait. Replace the watchdog.</li>
+    <li><strong>nginx</strong>: test the config inside the container; reload only if the file's hash changed.</li>
+    <li><strong>Start anything new</strong> in the compose file that is not running yet, without recreating what is.</li>
+    <li><strong>Health checks</strong> from inside the containers (no service has a host port). If anything failed along the way, dump container state and the last 120 log lines into the pipeline log, so a failed deploy explains itself.</li>
+  </ol>
+
+  <h2>The start-first rollout</h2>
+  <p><code class="inline">scripts/rollout.sh</code> replaces one service's containers the way Docker Swarm and Kubernetes do it: the new ones start <em>next to</em> the old ones and have to earn their place.</p>
+  <div class="diagram">
+    <svg viewBox="0 0 780 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Timeline of a start-first rollout: old replicas keep serving while new ones start, pass health, self-test and canary, then the old ones stop">
+      <text x="10" y="24" class="d-text mono">time →</text>
+      <line x1="120" y1="40" x2="770" y2="40" class="d-line"/>
+      <text x="170" y="34" text-anchor="middle" class="d-text sm">start new</text>
+      <text x="300" y="34" text-anchor="middle" class="d-text sm">healthy? (≤240 s)</text>
+      <text x="430" y="34" text-anchor="middle" class="d-text sm">self-test</text>
+      <text x="545" y="34" text-anchor="middle" class="d-text sm">canary 45 s</text>
+      <text x="690" y="34" text-anchor="middle" class="d-text sm">stop old (grace ≤180 s)</text>
+      <line x1="230" y1="36" x2="230" y2="200" class="d-line" stroke-dasharray="3 3"/>
+      <line x1="370" y1="36" x2="370" y2="200" class="d-line" stroke-dasharray="3 3"/>
+      <line x1="490" y1="36" x2="490" y2="200" class="d-line" stroke-dasharray="3 3"/>
+      <line x1="600" y1="36" x2="600" y2="200" class="d-line" stroke-dasharray="3 3"/>
+
+      <text x="10" y="70" class="d-text">old A</text>
+      <rect x="120" y="56" width="560" height="20" rx="4" class="d-box warm"/>
+      <text x="400" y="70" text-anchor="middle" class="d-text sm">serving</text>
+      <text x="10" y="100" class="d-text">old B</text>
+      <rect x="120" y="86" width="560" height="20" rx="4" class="d-box warm"/>
+      <text x="400" y="100" text-anchor="middle" class="d-text sm">serving</text>
+
+      <text x="10" y="140" class="d-text">new C</text>
+      <rect x="130" y="126" width="240" height="20" rx="4" class="d-box"/>
+      <text x="250" y="140" text-anchor="middle" class="d-text sm">booting, not in rotation yet</text>
+      <rect x="370" y="126" width="400" height="20" rx="4" class="d-box hi"/>
+      <text x="570" y="140" text-anchor="middle" class="d-text sm">serving alongside, then alone</text>
+      <text x="10" y="170" class="d-text">new D</text>
+      <rect x="130" y="156" width="240" height="20" rx="4" class="d-box"/>
+      <text x="250" y="170" text-anchor="middle" class="d-text sm">booting</text>
+      <rect x="370" y="156" width="400" height="20" rx="4" class="d-box hi"/>
+      <text x="570" y="170" text-anchor="middle" class="d-text sm">serving</text>
+
+      <text x="390" y="212" text-anchor="middle" class="d-text sm">Any failure before the last phase: remove C and D, A and B keep serving. A failed deploy is not an outage.</text>
+    </svg>
+    <p class="cap">nginx sees all four through Docker's DNS during the overlap. A stopped old container closes its port at once; nginx retries that request on another replica.</p>
+  </div>
+  <p>The gates, in order:</p>
+  <ol class="steps">
+    <li><strong>Healthy.</strong> Each new container must pass its Docker healthcheck within 240 s. Exited, dead or unhealthy means rollback.</li>
+    <li><strong>Self-test</strong> (backend only). Each container runs a startup self-test (<code class="inline">python -m src.ops selftest</code>) that lists what it is missing. The new container may not add a problem the old one did not have; a version that comes up without something it needs never replaces the running one.</li>
+    <li><strong>Canary.</strong> Old and new serve real traffic together for 45 s. The host collector reads nginx's access log and compares errors per replica. If the new ones fail more requests than the old ones, rollback.</li>
+    <li><strong>Retire the old.</strong> <code class="inline">docker stop</code> with a grace period: the stop signal closes the port immediately, nginx sends new requests elsewhere, and the old container has up to 180 s to finish the chats it is still streaming.</li>
+  </ol>
+  <p>Why it works, and would not work without each piece: nginx re-resolves the service name every 10 s (section 05); the services have no fixed container name and no host port (section 04); every container has a healthcheck (section 03); and each container is one process, so closing the port is instant.</p>
+
+  <h2>Rollback</h2>
+  <p>Revert the merge on the branch. The pipeline deploys the previous commit the same way. The database and Redis are untouched. One rule follows from the overlap: for about a minute the old and the new version run against the same database, so a <strong>schema change may only add</strong> tables and columns; drop or rename in a later release.</p>
+
+  <div class="box app">
+    <span class="label">In this project: the simplest possible deploy, for comparison</span>
+    <pre class="code">ssh vm 'cd /home/code/app &amp;&amp; git pull &amp;&amp; docker compose up -d --build'</pre>
+    <p>That one line is what most hobby projects need and it is roughly what this project did before <code class="inline">rollout.sh</code> existed: a few seconds of downtime while containers restart. Everything in <code class="inline">deploy.sh</code> beyond that line exists for a reason that was felt: the backup because a migration once had to be rehearsed; the folder ownership because of <code class="inline">data/recast</code>; the self-test gate because a container once came up without what it needed; the canary because "healthy" does not mean "answers correctly". Start with the one line. Add each piece when you feel its reason.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfall: building on the machine that serves</span>
+    <p>Building the image on the two-core VM takes six minutes and competes with live traffic. The common alternative is to build in CI, push the image to a registry (Azure Container Registry, GitHub's ghcr.io), and have the VM only <em>pull</em>: seconds instead of minutes, and the exact image that was tested is what runs. This project builds on the VM to stay simple; know that the other option exists.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Where does the deployment job run, and why does that matter for credentials?</summary><p>On the VM itself, through the agent registered with the ADO environment. The pipeline's job token makes the checkout, so the VM holds no personal access token, and nothing needs SSH access into the VM from outside.</p></details>
+  <details class="qa"><summary>Name the three gates a new backend container passes before an old one stops.</summary><p>Its Docker healthcheck; the startup self-test must add no new problem compared with the old container; the 45 s canary on nginx's access log must show it failing no more requests than the old ones.</p></details>
+  <details class="qa"><summary>A new version renames a database column. Why is that forbidden here, and what should happen instead?</summary><p>During the overlap the old containers still run queries with the old column name against the same database and would fail. Add the new column in this release, make the code use it, and drop the old one in a later release.</p></details>
+</section>
+
+<!-- ===================================================== 11 OPS ===== -->
+<section class="sec" id="ops" data-title="Monitoring and operations">
+  <p class="eyebrow">Section 11</p>
+  <h1><span class="sec-num">11 · OPERATIONS</span>Monitoring and operations</h1>
+  <p class="lede">Deploying is half the job. The other half is answering three questions at any hour: is it up, is it healthy, and who gets told when it is not. The rule this platform follows: each VM watches itself, and Azure watches the VM from outside, so a dead VM still raises an alert.</p>
+
+  <h2>The pieces, from the inside out</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Piece</th><th>Where it runs</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Docker healthchecks</td><td>Docker, per container</td><td>Marks each container healthy or unhealthy; the raw signal everything else reads.</td></tr>
+      <tr><td class="k">Watchdog</td><td>The <code class="inline">agent-watchdog</code> container (<code class="inline">src/ops/</code>)</td><td>Runs the checks every 30 s to 5 min: backend health from outside the backend, the site over TLS as users see it (and the certificate's expiry), MCP, Postgres, Redis, Foundry, Azure ML, Key Vault, disk, memory, CPU, backup age, degraded modes, API latency. Opens an incident after N failing runs in a row and resolves it after N passing ones, so one slow probe never pages anyone. Keeps incidents in Postgres. Logs a heartbeat to Application Insights every minute.</td></tr>
+      <tr><td class="k">Host collector</td><td>systemd timers on the VM, as root (<code class="inline">infra/ops-host/</code>)</td><td>Every minute writes <code class="inline">data/ops/host.json</code>: each container's state, restarts, out-of-memory kills, CPU and memory, the host's load and disk, what nginx served. Restarts a stateless container that has been unhealthy for 3 minutes (never Postgres or Redis, never during a deploy). Daily 02:30: <code class="inline">pg_dump</code> backup, last ten kept. Weekly: prune old images and build cache.</td></tr>
+      <tr><td class="k">Azure Monitor alerts</td><td>Azure, outside the VM (<code class="inline">infra/monitoring/</code>)</td><td>Emails (and a Teams channel) when: the VM's availability drops; Azure reports the VM degraded; the watchdog's heartbeat is missing for 10 minutes; a critical or warning incident is open (and again when it resolves).</td></tr>
+      <tr><td class="k">Application Insights</td><td>Azure</td><td>Receives a trace for every agent turn (model, tokens, tool calls), the watchdog's heartbeat and incidents. Queried live by the admin console.</td></tr>
+      <tr><td class="k">Admin console</td><td>The app, <code class="inline">/admin/status</code></td><td>The checks with their uptime, open incidents with impact and runbook, host and container figures, capacity charts, recent deploys.</td></tr>
+      <tr><td class="k">Ops command line</td><td>Your laptop, <code class="inline">scripts/ops.py</code></td><td>Status, logs, SQL, Redis, API calls, restarts on either VM over SSH. Read-only by default; changes on prod need <code class="inline">--yes</code> and are written to an audit table.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Why the host collector exists at all</h2>
+  <p>Some things only the host can see or do: which containers restarted, whether one was killed for memory, restarting an unhealthy one, running <code class="inline">pg_dump</code> against the volume, pruning Docker. The usual shortcut is to give a monitoring container the Docker socket, which is root on the host in disguise: any bug in that container owns the machine. This platform refuses that: a plain Python script, run by systemd timers as root <em>outside</em> every container, writes what it sees to a JSON file, and the watchdog container reads the file read-only. No container holds the socket. That is least privilege applied to monitoring.</p>
+  <pre class="code"><span class="c"># on the VM</span>
+systemctl list-timers 'tcc-ops*'          <span class="c"># the three timers and their next run</span>
+journalctl -u tcc-ops@collect -n 50       <span class="c"># the collector's log</span>
+jq . data/ops/host.json                   <span class="c"># what it saw last minute</span></pre>
+
+  <h2>Degraded modes: fallbacks that speak up</h2>
+  <p>A quiet rule in the code: anything that carries on without something it needs (a guide file missing, a secret that fell back from Key Vault to <code class="inline">.env</code>, a sync that failed) calls <code class="inline">degraded(code, detail, impact=...)</code> instead of merely logging a warning, and <code class="inline">recovered(code)</code> when it works again. The watchdog turns every active degraded mode into an incident. The same self-test gates deploys (section 10). A warning in a log that nobody reads is not monitoring; an incident in a console with a runbook is.</p>
+
+  <h2>Who notices what, and how fast</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Event</th><th>Noticed by</th><th>Roughly</th></tr></thead>
+    <tbody>
+      <tr><td class="k">A backend container crashes</td><td>Docker restarts it; the watchdog's <code class="inline">container_events</code> check opens an incident</td><td>1 minute</td></tr>
+      <tr><td class="k">The backend runs but hangs</td><td>The healthcheck fails, nginx stops sending to it, the watchdog's <code class="inline">backend</code> check fails from outside</td><td>1 to 2 minutes</td></tr>
+      <tr><td class="k">A container stays unhealthy</td><td>The host collector restarts it (if stateless)</td><td>3 minutes</td></tr>
+      <tr><td class="k">The disk fills</td><td><code class="inline">disk</code> check, warning at 85%, critical at 95%; alert email</td><td>minutes</td></tr>
+      <tr><td class="k">The whole VM dies</td><td>Azure Monitor: VM availability and the missing heartbeat</td><td>5 to 15 minutes</td></tr>
+      <tr><td class="k">The certificate is about to expire</td><td><code class="inline">tls_cert</code>: warning at 21 days, critical at 7</td><td>weeks ahead</td></tr>
+      <tr><td class="k">Last night's backup did not run</td><td><code class="inline">backup</code> check: newest dump older than 26 hours</td><td>within the day</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Logs: where to look</h2>
+  <pre class="code">sudo docker compose ps                        <span class="c"># state and health, first thing always</span>
+sudo docker compose logs --tail 200 backend   <span class="c"># application output</span>
+sudo docker exec nginx-proxy tail -f /var/log/nginx/access.log   <span class="c"># every request: status, time, upstream</span>
+sudo docker compose logs watchdog             <span class="c"># what the checks saw</span>
+df -h; free -m                                <span class="c"># disk and memory on the host</span></pre>
+  <p>nginx's access log line carries the request time, which upstream answered and with which status; the canary in section 10 reads exactly those fields.</p>
+
+  <div class="box app">
+    <span class="label">In this project: the ops command line from a laptop</span>
+    <p><code class="inline">uv run scripts/ops.py</code> runs commands on either VM over SSH, with JSON output so a coding agent can use it too. Its read-only defaults are guard rails against mistakes, not a security boundary: whoever holds the SSH key is root on the VM in effect, so the boundary is who can reach the VM (the VPN) and holds that key. The repo skill <code class="inline">.claude/skills/ops</code> documents the commands; <code class="inline">docs/monitoring.md</code> is the full reference.</p>
+  </div>
+
+  <div class="box warn">
+    <span class="label">Pitfalls</span>
+    <ul>
+      <li><strong>Monitoring only from the inside.</strong> A watchdog on the VM cannot tell you the VM is gone. The external alert on the heartbeat exists for that case.</li>
+      <li><strong>Alerts that cry wolf.</strong> One failing probe opens nothing here; incidents need N failures in a row and resolve after N passes. An alert that fires every day gets muted, and then the real one is missed.</li>
+      <li><strong>No backup is a backup until you restored from it.</strong> The Postgres 15 to 18 migration was rehearsed on copies before the deploy. Do a restore drill once.</li>
+    </ul>
+  </div>
+
+  <div class="box idea">
+    <span class="label">For your own project, in this order</span>
+    <ol class="steps">
+      <li>A <code class="inline">/health</code> endpoint that checks the database, and a Docker healthcheck that calls it. <code class="inline">restart: unless-stopped</code>.</li>
+      <li>A free external uptime checker (any of the well-known ones) pinging <code class="inline">/health</code> every minute from the internet and emailing you. This is your "Azure watches from outside".</li>
+      <li>A daily backup by cron (<code class="inline">pg_dump</code>, or copy the SQLite file), kept for a week, restored once to prove it works.</li>
+      <li>Logs you can read: <code class="inline">docker compose logs</code> is enough until you have users.</li>
+      <li>Later: a disk-space alert, tracing of each agent turn, incidents with runbooks.</li>
+    </ol>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>Why does no container get the Docker socket, and what does the platform do instead?</summary><p>The socket is root on the host; a bug in that container would own the VM. Instead, a script run by systemd timers as root outside the containers records host and container state to a JSON file, and the watchdog reads it read-only.</p></details>
+  <details class="qa"><summary>The VM loses power. Walk through how someone finds out.</summary><p>The watchdog stops logging its heartbeat to Application Insights; after 10 minutes the heartbeat alert fires an email. In parallel Azure's own VM availability metric drops and that alert fires within about 5 minutes. Nothing on the VM is involved, which is the point.</p></details>
+  <details class="qa"><summary>What is the difference between a log warning and a degraded mode here?</summary><p>A warning sits in a log until someone reads it. A degraded mode is recorded by the code, becomes an incident in the watchdog, shows in the console with its impact and runbook, emails if critical or warning, and blocks a deploy if it is new in the new version.</p></details>
+</section>
+
+<!-- ===================================================== 12 IAC ===== -->
+<section class="sec" id="iac" data-title="Infrastructure as code">
+  <p class="eyebrow">Section 12</p>
+  <h1><span class="sec-num">12 · INFRASTRUCTURE</span>Infrastructure as code</h1>
+  <p class="lede">Clicking a VM together in the Azure portal works once. Writing it down as a file means you can review it, rebuild it, and make a second one that is identical. The file is the documentation, and it cannot drift from reality because it is what created reality.</p>
+
+  <h2>The idea</h2>
+  <p>You describe the resources you want (a VM of this size, a firewall with these rules, a vault with this policy) in a declarative file. A tool compares the file with what exists and creates, changes or deletes only the difference. Running it twice changes nothing the second time; that property is called <strong>idempotent</strong>, and it is what makes the file safe to re-run after every edit. On Azure the native language is <strong>Bicep</strong>; <strong>Terraform</strong> does the same across clouds. The ideas transfer one-to-one.</p>
+  <p>Two commands matter. <code class="inline">what-if</code> shows the diff before touching anything: a line per resource, marked create, modify or delete. <code class="inline">deploy</code> applies it. The project's scripts default to <code class="inline">what-if</code>, so the dangerous action takes a deliberate word.</p>
+
+  <h2>Read a piece of the real Bicep</h2>
+  <pre class="code"><span class="c">// infra/app-vm/main.bicep, abridged</span>
+<span class="k">param</span> vmName <span class="k">string</span> = <span class="s">'AZ-PRD-SV-MCP01'</span>
+<span class="k">param</span> vmSize <span class="k">string</span> = <span class="s">'Standard_B2as_v2'</span>
+<span class="k">param</span> subnetId <span class="k">string</span>              <span class="c">// IT owns the network: passed in, not created</span>
+<span class="k">param</span> adminSshPublicKey <span class="k">string</span>     <span class="c">// the key, never a password</span>
+
+<span class="k">resource</span> nsg <span class="s">'Microsoft.Network/networkSecurityGroups@2023-11-01'</span> = {
+  name: <span class="s">'${vmName}-nsg'</span>
+  properties: {
+    securityRules: [
+      {
+        name: <span class="s">'Internal-SSH-HTTP-HTTPS'</span>
+        properties: {
+          priority: 1090
+          direction: <span class="s">'Inbound'</span>
+          access: <span class="s">'Allow'</span>
+          protocol: <span class="s">'Tcp'</span>
+          sourceAddressPrefixes: [<span class="s">'10.0.0.0/8'</span>, <span class="s">'172.16.0.0/16'</span>]
+          destinationPortRanges: [<span class="s">'22'</span>, <span class="s">'80'</span>, <span class="s">'443'</span>]
+        }
+      }
+      <span class="c">// ... DevRev on 443, the SQL host; no rule for 'Internet'</span>
+    ]
+  }
+}
+
+<span class="k">resource</span> vm <span class="s">'Microsoft.Compute/virtualMachines@2024-03-01'</span> = {
+  name: vmName
+  identity: { type: <span class="s">'UserAssigned'</span>, userAssignedIdentities: { <span class="s">'${vmIdentityId}'</span>: {} } }
+  properties: {
+    hardwareProfile: { vmSize: vmSize }
+    osProfile: {
+      adminUsername: <span class="s">'tccadmin'</span>
+      customData: loadFileAsBase64(<span class="s">'cloud-init.yaml'</span>)   <span class="c">// section 02</span>
+      linuxConfiguration: { disablePasswordAuthentication: true, ssh: { publicKeys: [ ... ] } }
+    }
+  }
+}</pre>
+  <p>Every fact from sections 02 and 06 is a line here: the size, the key-only login, the first-boot script, the three firewall rules. Reading Bicep is reading a spec sheet with braces.</p>
+
+  <h2>What this project keeps as code</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Folder</th><th>Describes</th><th>Applied by</th></tr></thead>
+    <tbody>
+      <tr><td class="k">infra/app-vm/</td><td>The prod VM, its network card, public IP, NSG, managed identity and Key Vault (with a firewall admitting only the VM's subnet).</td><td><code class="inline">deploy.sh what-if | deploy</code>, by hand, once</td></tr>
+      <tr><td class="k">infra/foundry/</td><td>The AI Foundry account and project, every model deployment, Application Insights and its Log Analytics workspace; writes the keys into Key Vault without printing them.</td><td><code class="inline">deploy.sh what-if | deploy [dev|prod]</code>, by hand, when models change</td></tr>
+      <tr><td class="k">infra/monitoring/</td><td>The Azure Monitor alerts and the email/Teams action group, per environment.</td><td>by hand, per environment</td></tr>
+      <tr><td class="k">infra/entra/</td><td>The request bodies for the sign-in app registration and group assignments.</td><td>an admin, with <code class="inline">az rest</code></td></tr>
+      <tr><td class="k">infra/nginx/, infra/systemd/, infra/ops-host/</td><td>The proxy config, the boot unit, the host timers.</td><td>every deploy, by <code class="inline">scripts/deploy.sh</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Note the split: the application's own infrastructure (nginx, timers) rides along with every deploy, while the Azure resources are applied by hand, deliberately, and <em>before</em> merging a config change that depends on them, because a merge to <code class="inline">main</code> deploys production immediately.</p>
+
+  <h2>What is deliberately not in code</h2>
+  <ul>
+    <li>The virtual network and subnet: IT's, passed in as a parameter.</li>
+    <li>DNS entries for <code class="inline">chat.tccglobal.com</code>: IT's.</li>
+    <li>Role assignments that need an Owner (the VM's identity reading the vault): listed in the README as an IT request.</li>
+    <li>The certificate, the <code class="inline">.env</code>, the pipeline agent's registration: credentials, so they are runbook steps.</li>
+    <li>Secret <em>values</em>: Key Vault holds them; the code holds only their names.</li>
+  </ul>
+  <p>The README next to each Bicep file is the runbook for those steps, in order, with the checks after each. The combination "file for what can be a file, numbered runbook for the rest" is the realistic version of infrastructure as code.</p>
+
+  <div class="box app">
+    <span class="label">In this project: how what-if lies a little</span>
+    <p><code class="inline">infra/foundry/README.md</code> warns that what-if lists every model deployment as "modify" because of fields the server fills in; only a changed size, capacity, model or routing is real. Tools are honest about the diff they compute, not about the diff you care about. Learn each tool's noise.</p>
+  </div>
+
+  <div class="box idea">
+    <span class="label">For your own project</span>
+    <p>Start in the portal if you must, but the moment it works, export it or rewrite it as a Bicep or Terraform file of one VM, one NSG and one public IP (under 100 lines), and delete and recreate the VM from the file once. That single exercise teaches more than any reading. Keep a numbered runbook for the manual steps next to it.</p>
+  </div>
+
+  <h2>Check yourself</h2>
+  <details class="qa"><summary>What does idempotent mean for an infrastructure tool, and why do you want it?</summary><p>Applying the same file twice leaves the second run with nothing to do. You can re-run after every edit without fear of duplicating or breaking resources, and the file stays the truth about what exists.</p></details>
+  <details class="qa"><summary>Why is the subnet a parameter rather than a resource in <code class="inline">main.bicep</code>?</summary><p>The network belongs to IT and already exists; the VM must join it, not create a new one. Taking its id as input keeps the file's responsibility to what the team owns.</p></details>
+  <details class="qa"><summary>Why apply a Foundry change before merging the <code class="inline">config.yaml</code> that uses it?</summary><p>A merge to <code class="inline">main</code> deploys prod at once. If the config names a model deployment that does not exist yet, prod would ship broken. Infrastructure first, then the code that depends on it.</p></details>
+</section>
+
+<!-- ===================================================== 13 BUILD ===== -->
+<section class="sec" id="build" data-title="Build your own">
+  <p class="eyebrow">Section 13</p>
+  <h1><span class="sec-num">13 · BUILD IT</span>Build your own: mini-agents online</h1>
+  <p class="lede">The smallest honest version of everything above, for mini-agents: a Dockerfile, a compose file with automatic HTTPS, a GitHub Actions pipeline that tests and deploys, one small VM, and a way to know it is up. Eight steps, each with a success check. Do them in order.</p>
+
+  <h2>What this project uses versus what you need first</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th></th><th>agents_and_connectors</th><th>mini-agents, first version</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Machine</td><td>Two Azure B2as_v2 VMs</td><td>One small VM (Azure B1s/B2s or any provider), Ubuntu LTS</td></tr>
+      <tr><td class="k">Proxy and TLS</td><td>nginx with a corporate wildcard certificate</td><td>Caddy, which fetches free Let's Encrypt certificates by itself</td></tr>
+      <tr><td class="k">Database</td><td>Postgres with pgvector, a volume</td><td>SQLite in a mounted folder; Postgres later</td></tr>
+      <tr><td class="k">CI</td><td>Azure Pipelines, four jobs</td><td>GitHub Actions, one job: ruff, pytest, docker build</td></tr>
+      <tr><td class="k">Deploy</td><td>Agent on the VM, start-first rollout, canary</td><td>A job that SSHes in and runs <code class="inline">git pull &amp;&amp; docker compose up -d --build</code></td></tr>
+      <tr><td class="k">Secrets</td><td>Key Vault via managed identity</td><td><code class="inline">.env</code> on the VM, mode 600, never in git; GitHub Secrets for the deploy key</td></tr>
+      <tr><td class="k">Firewall</td><td>NSG with three rules</td><td>The provider's firewall: 22 from your IP, 80 and 443 from anywhere</td></tr>
+      <tr><td class="k">Monitoring</td><td>Watchdog, host timers, Azure Monitor, App Insights</td><td><code class="inline">/health</code>, Docker healthcheck, an external uptime checker, a backup cron</td></tr>
+      <tr><td class="k">Infrastructure as code</td><td>Bicep for VM, models, alerts</td><td>Later; a numbered runbook first</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The eight steps</h2>
+  <ol class="steps">
+    <li><strong>A Dockerfile for mini-agents.</strong> Multi-stage, uv from the lock, non-root, a healthcheck. Adjust the module path to your FastAPI app.
+      <pre class="code"><span class="k">FROM</span> python:3.12-slim <span class="k">AS</span> builder
+<span class="k">COPY</span> --from=ghcr.io/astral-sh/uv:0.12 /uv /bin/uv
+<span class="k">WORKDIR</span> /app
+<span class="k">COPY</span> pyproject.toml uv.lock ./
+<span class="k">RUN</span> uv sync --locked --no-install-project --no-dev
+
+<span class="k">FROM</span> python:3.12-slim
+<span class="k">RUN</span> useradd --uid 1000 --create-home appuser
+<span class="k">WORKDIR</span> /app
+<span class="k">COPY</span> --from=builder /app/.venv /app/.venv
+<span class="k">ENV</span> PATH=<span class="s">"/app/.venv/bin:$PATH"</span>
+<span class="k">COPY</span> --chown=appuser src/ ./src/
+<span class="k">COPY</span> --chown=appuser web/ ./web/
+<span class="k">USER</span> appuser
+<span class="k">EXPOSE</span> 8000
+<span class="c"># slim has no curl; a Python one-liner does the same job</span>
+<span class="k">HEALTHCHECK</span> --interval=30s --timeout=5s --retries=3 \
+  CMD python -c <span class="s">"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"</span>
+<span class="k">CMD</span> [<span class="s">"uvicorn"</span>, <span class="s">"src.api:app"</span>, <span class="s">"--host"</span>, <span class="s">"0.0.0.0"</span>, <span class="s">"--port"</span>, <span class="s">"8000"</span>]</pre>
+      <span class="fine">Success: <code class="inline">docker build -t mini-agents .</code> then <code class="inline">docker run --rm -p 8000:8000 --env-file .env mini-agents</code> serves the chat page, and <code class="inline">docker ps</code> shows it healthy after a minute.</span></li>
+
+    <li><strong>A compose file with Caddy in front.</strong> The app publishes no port; Caddy does, and gets the certificate itself.
+      <pre class="code"><span class="c"># docker-compose.yml</span>
+services:
+  app:
+    build: .
+    env_file: .env
+    volumes:
+      - ./data:/app/data            <span class="c"># the SQLite file and anything else that must survive</span>
+    restart: unless-stopped
+  caddy:
+    image: caddy:2-alpine
+    ports: [<span class="s">"80:80"</span>, <span class="s">"443:443"</span>]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data            <span class="c"># certificates live here</span>
+    depends_on: [app]
+    restart: unless-stopped
+volumes:
+  caddy-data:</pre>
+      <pre class="code"><span class="c"># Caddyfile: one line of config is the whole reverse proxy with HTTPS</span>
+agents.yourdomain.example {
+    reverse_proxy app:8000
+}</pre>
+      <span class="fine">Success locally (before you have a domain): put <code class="inline">:80</code> instead of the hostname, run <code class="inline">docker compose up -d</code>, open <code class="inline">http://localhost/</code>. The app is reachable only through Caddy.</span></li>
+
+    <li><strong>CI on GitHub Actions.</strong> The workflow from section 09, in <code class="inline">.github/workflows/ci.yml</code>. Then in the repo's settings, protect <code class="inline">master</code>: require the <code class="inline">checks</code> job to pass before merging.
+      <span class="fine">Success: a pull request with a deliberate ruff error shows a red check and the merge button is disabled.</span></li>
+
+    <li><strong>A VM.</strong> Ubuntu LTS, SSH key only, a public IP. In the provider's firewall allow 22 from your own IP, and 80 and 443 from anywhere. Then, on the VM:
+      <pre class="code">curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER            <span class="c"># log out and in again</span>
+sudo install -d -o $USER -g $USER /home/code
+git clone https://github.com/nazlibc/mini-agents.git /home/code/mini-agents</pre>
+      <span class="fine">Success: <code class="inline">docker run --rm hello-world</code> works without sudo; <code class="inline">ssh</code> with a password is refused.</span></li>
+
+    <li><strong>Secrets on the VM.</strong> Create <code class="inline">/home/code/mini-agents/.env</code> with your <code class="inline">OPENAI_API_KEY</code>, <code class="inline">chmod 600 .env</code>. Confirm <code class="inline">.env</code> is in <code class="inline">.gitignore</code> (it already is).
+      <span class="fine">Success: <code class="inline">git status</code> on the VM never lists <code class="inline">.env</code>.</span></li>
+
+    <li><strong>A domain and HTTPS.</strong> Point a DNS A record (a subdomain of a domain you own, or a free dynamic-DNS name) at the VM's public IP. Put that name in the Caddyfile. <code class="inline">docker compose up -d</code>. Caddy obtains the certificate within a minute.
+      <span class="fine">Success: <code class="inline">https://agents.yourdomain.example/health</code> answers with a padlock, and <code class="inline">http://</code> redirects to <code class="inline">https://</code>.</span></li>
+
+    <li><strong>Deploy from the pipeline.</strong> Make a dedicated SSH key pair for deploys: public half on the VM, private half as a GitHub secret (<code class="inline">VM_SSH_KEY</code>), plus <code class="inline">VM_HOST</code>. Add a job that runs only on pushes to <code class="inline">master</code>, after the checks:
+      <pre class="code">  deploy:
+    needs: checks
+    if: github.ref == 'refs/heads/master' &amp;&amp; github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: appleboy/ssh-action@v1          <span class="c"># or plain ssh with the key written to a file</span>
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: deploy
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: |
+          cd /home/code/mini-agents
+          git pull --ff-only
+          docker compose up -d --build
+          sleep 10
+          curl -fsS https://agents.yourdomain.example/health</pre>
+      <span class="fine">Success: merge a visible change (a word on the chat page) and see it live within a few minutes without touching the VM. A failing <code class="inline">curl</code> turns the run red.</span></li>
+
+    <li><strong>Know it is up.</strong> An external uptime checker on <code class="inline">/health</code> every minute, emailing you. A cron entry on the VM: <code class="inline">0 3 * * * cp /home/code/mini-agents/data/app.db /home/code/backups/app-$(date +\%F).db</code>, and delete copies older than seven days. Restore one once to a fresh folder and open it.
+      <span class="fine">Success: stop the app container on purpose and get the email within two minutes; start it again.</span></li>
+  </ol>
+
+  <h2>Level two, when you feel the need</h2>
+  <ul>
+    <li><strong>Build in CI, pull on the VM.</strong> Push the image to <code class="inline">ghcr.io</code> from the workflow; the deploy becomes <code class="inline">docker compose pull &amp;&amp; docker compose up -d</code> in seconds, and the tested image is the running image.</li>
+    <li><strong>Postgres instead of SQLite</strong>, as a compose service with a named volume and a <code class="inline">pg_dump</code> cron, as this project does.</li>
+    <li><strong>Start-first rollouts.</strong> Two app replicas, no <code class="inline">container_name</code>, a healthcheck, and Caddy's reverse proxy finds both by DNS. Then a script like <code class="inline">rollout.sh</code>. Read this project's with the section 10 diagram next to it.</li>
+    <li><strong>A dev environment.</strong> A second compose project on the same VM on another hostname, deployed from a <code class="inline">dev</code> branch.</li>
+    <li><strong>Infrastructure as code.</strong> One Bicep or Terraform file for the VM and its firewall.</li>
+    <li><strong>Tracing.</strong> OpenTelemetry spans per agent turn, to any backend; it is how this project's admin console knows which model and how many tokens.</li>
+  </ul>
+
+  <h2>Costs, roughly</h2>
+  <p>These are ballpark figures to size your expectations; check the provider's current price list. A small VM with 1 vCPU and 1 GB is around ten euros a month, 2 vCPU and 4 GB around thirty to forty. A domain is about ten euros a year. Let's Encrypt certificates are free. GitHub Actions is free for public repositories and has a generous free allowance for private ones. The model calls will cost more than the server.</p>
+
+  <div class="box warn">
+    <span class="label">Beginner mistakes this list is designed to prevent</span>
+    <ul>
+      <li>Publishing the database port (<code class="inline">5432:5432</code>) "to connect from my laptop". Use <code class="inline">ssh -L</code> port forwarding instead.</li>
+      <li>Committing <code class="inline">.env</code>. Rotate the key if it ever happens; deleting the file later does not help.</li>
+      <li>Port 22 open to the world with password login enabled. Key only, and your IP only if your provider lets you.</li>
+      <li>No <code class="inline">restart</code> policy: the first reboot takes the site down until you notice.</li>
+      <li>No backup, or a backup never restored.</li>
+      <li>Running the app as root in the container.</li>
+    </ul>
+  </div>
+
+  <div class="box idea">
+    <span class="label">Where this leaves you</span>
+    <p>After step 8 you will have personally done each thing this guide described: packed an app, wired containers, put a proxy with HTTPS in front, opened exactly three ports, written a pipeline that tests and deploys, and set up the first alert. Every section before this one becomes a memory of something you did, which is the only way this material sticks.</p>
+  </div>
+</section>
+
+<!-- ===================================================== 14 REFERENCE ===== -->
+<section class="sec" id="reference" data-title="Cheat sheet, glossary, resources">
+  <p class="eyebrow">Section 14</p>
+  <h1><span class="sec-num">14 · REFERENCE</span>Cheat sheet, glossary, resources</h1>
+  <p class="lede">The commands you will type, the words you will hear, and what to read next.</p>
+
+  <h2>Cheat sheet</h2>
+  <pre class="code"><span class="c"># ── Docker ─────────────────────────────────────────────────────────</span>
+docker build -f backend.Dockerfile -t name:tag .
+docker run --rm -p 8000:8000 --env-file .env name:tag
+docker ps                       docker logs -f &lt;c&gt;         docker exec -it &lt;c&gt; bash
+docker images                   docker system prune        docker volume ls
+
+<span class="c"># ── Compose ────────────────────────────────────────────────────────</span>
+docker compose up -d [--build]  docker compose ps          docker compose logs -f &lt;svc&gt;
+docker compose restart &lt;svc&gt;    docker compose exec &lt;svc&gt; bash
+docker compose down             docker compose down -v     <span class="c"># -v destroys the volumes</span>
+
+<span class="c"># ── The VM ─────────────────────────────────────────────────────────</span>
+ssh tccadmin@172.16.126.36      <span class="c"># dev, from the TCC network or VPN</span>
+sudo systemctl status docker    systemctl list-timers 'tcc-ops*'
+journalctl -u mcp-stack -f      journalctl -u tcc-ops@collect -n 50
+df -h   free -m   top
+
+<span class="c"># ── This project ───────────────────────────────────────────────────</span>
+make start                      <span class="c"># laptop: postgres+redis containers, api, web</span>
+make up / make down             <span class="c"># laptop: the full compose stack</span>
+make lint-fix                   <span class="c"># before every commit</span>
+uv run scripts/ops.py status dev
+curl -s https://chat.tccglobal.com/api/health
+
+<span class="c"># ── Azure CLI, read-only looks ─────────────────────────────────────</span>
+az login
+az vm list -o table
+az network nsg rule list -g RG_DAMCP_Dev --nsg-name AZ-DEV-SV-MCP01-nsg -o table
+az keyvault secret list --vault-name AZ-DEV-SV-MCP-KV-01 -o table   <span class="c"># names only</span></pre>
+
+  <h2>When something breaks: the order to look</h2>
+  <ol class="steps">
+    <li>Is the VM up? The Azure portal, or <code class="inline">ping</code> / <code class="inline">ssh</code> from the VPN. If not, nothing below matters.</li>
+    <li>Is Docker up? <code class="inline">sudo systemctl status docker</code>.</li>
+    <li>Which container is unhealthy? <code class="inline">sudo docker compose ps</code>. Then its logs.</li>
+    <li>Disk full? <code class="inline">df -h</code>. Postgres and Docker both stop writing at 100%.</li>
+    <li>nginx: <code class="inline">docker exec nginx-proxy nginx -t -c /etc/nginx/tcc/nginx-proxy.conf</code>, then its error log.</li>
+    <li>Certificate expired? <code class="inline">openssl s_client -connect chat.tccglobal.com:443 -servername chat.tccglobal.com | openssl x509 -noout -dates</code>.</li>
+    <li>DNS or firewall? <code class="inline">nslookup chat.tccglobal.com</code>; the NSG rules with <code class="inline">az network nsg rule list</code>.</li>
+    <li>Was there a deploy? <code class="inline">cat data/ops/deploy.json</code>; the pipeline run's log.</li>
+    <li>Still lost? The admin console's Status page and <code class="inline">docs/monitoring.md</code>'s runbooks.</li>
+  </ol>
+
+  <h2>Glossary</h2>
+  <div class="tw"><table class="t">
+    <tbody>
+      <tr><td class="k">Agent (pipeline)</td><td>The machine that runs a pipeline job. Hosted: Microsoft's throwaway VM. Self-hosted: your own, with the agent software installed.</td></tr>
+      <tr><td class="k">Bicep</td><td>Azure's language for describing resources as files. Terraform is the cross-cloud equivalent.</td></tr>
+      <tr><td class="k">Bind mount</td><td>A host folder made visible inside a container. Survives the container; owned by whoever created it.</td></tr>
+      <tr><td class="k">Canary</td><td>Letting a new version serve a share of real traffic next to the old one, and watching for errors before committing to it.</td></tr>
+      <tr><td class="k">CD</td><td>Continuous deployment: the pipeline puts the code on the machine after CI passes.</td></tr>
+      <tr><td class="k">CI</td><td>Continuous integration: the pipeline runs the checks on every change to a shared branch.</td></tr>
+      <tr><td class="k">cloud-init</td><td>The standard first-boot script of a cloud VM: packages to install, commands to run.</td></tr>
+      <tr><td class="k">Container</td><td>A running process with its own filesystem view, network address and hostname, started from an image.</td></tr>
+      <tr><td class="k">Degraded mode</td><td>Here: a recorded state in which code carries on without something it needs; becomes an incident.</td></tr>
+      <tr><td class="k">DNS</td><td>Names to addresses. Docker runs a private one for container names at 127.0.0.11.</td></tr>
+      <tr><td class="k">Docker Compose</td><td>A YAML file and command that run several containers together on a private network.</td></tr>
+      <tr><td class="k">Environment (ADO)</td><td>A named target (dev, prod) that pipeline deployment jobs run against; here each holds one VM resource.</td></tr>
+      <tr><td class="k">Grace period</td><td>How long a stopping container may take to finish its work before being killed.</td></tr>
+      <tr><td class="k">Healthcheck</td><td>A command Docker runs periodically to label a container healthy or unhealthy.</td></tr>
+      <tr><td class="k">HSTS</td><td>A header telling browsers to use HTTPS only for this site for a long time.</td></tr>
+      <tr><td class="k">Idempotent</td><td>Doing it twice has the same effect as doing it once. Infrastructure tools and migrations should be.</td></tr>
+      <tr><td class="k">Image</td><td>A frozen, layered filesystem built from a Dockerfile; what containers are started from.</td></tr>
+      <tr><td class="k">Ingress / egress</td><td>Inbound / outbound network traffic.</td></tr>
+      <tr><td class="k">Key Vault</td><td>Azure's secret store; read here by the VM's managed identity.</td></tr>
+      <tr><td class="k">Let's Encrypt</td><td>A free certificate authority; Caddy and certbot fetch and renew its certificates automatically.</td></tr>
+      <tr><td class="k">Lock file</td><td><code class="inline">uv.lock</code>, <code class="inline">pnpm-lock.yaml</code>: exact dependency versions, so every build installs the same set.</td></tr>
+      <tr><td class="k">Managed identity</td><td>An Azure identity owned by a resource (the VM), granted rights directly; no password exists.</td></tr>
+      <tr><td class="k">Multi-stage build</td><td>A Dockerfile with several FROM lines; only the last stage ships, without the build tools.</td></tr>
+      <tr><td class="k">NSG</td><td>Network security group: Azure's firewall rules attached to a network card or subnet. Default deny inbound.</td></tr>
+      <tr><td class="k">On-behalf-of</td><td>Exchanging a person's token for another token that still names the person, so a downstream read is theirs.</td></tr>
+      <tr><td class="k">Port</td><td>A numbered door on an address. 22 SSH, 80 HTTP, 443 HTTPS, 5432 Postgres, 6379 Redis.</td></tr>
+      <tr><td class="k">Private / public IP</td><td>Reachable inside a private network only, versus from the internet.</td></tr>
+      <tr><td class="k">Replica</td><td>One of several identical containers of the same service.</td></tr>
+      <tr><td class="k">Reverse proxy</td><td>The server in front of your servers: TLS, routing, load balancing, policy. nginx, Caddy, Traefik.</td></tr>
+      <tr><td class="k">Rollback</td><td>Returning to the previous version; here, by reverting the merge.</td></tr>
+      <tr><td class="k">SSE</td><td>Server-sent events: a long-lived HTTP response that streams tokens; needs buffering off at the proxy.</td></tr>
+      <tr><td class="k">SSH</td><td>Secure shell: a remote terminal, authenticated with a key pair.</td></tr>
+      <tr><td class="k">Start-first</td><td>Rollout order: start the new version, verify it, then stop the old. Opposite: stop-first, which has downtime.</td></tr>
+      <tr><td class="k">Subnet</td><td>A range of private addresses inside a virtual network.</td></tr>
+      <tr><td class="k">systemd</td><td>Linux's service manager: starts things at boot, runs timers, keeps logs (journalctl).</td></tr>
+      <tr><td class="k">TLS</td><td>The encryption and identity layer under HTTPS. Terminated at the proxy.</td></tr>
+      <tr><td class="k">Volume (named)</td><td>Docker-managed storage that outlives containers; where databases keep their files.</td></tr>
+      <tr><td class="k">VNet</td><td>Azure virtual network: the private network a VM's private IP lives in.</td></tr>
+      <tr><td class="k">VPN</td><td>A tunnel that places a remote machine inside a private network.</td></tr>
+      <tr><td class="k">Watchdog</td><td>Here: the container that runs health checks and keeps incidents.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Files to read in agents_and_connectors, in this order</h2>
+  <ol class="steps">
+    <li><code class="inline">docker-compose.yml</code>: the whole system on one page.</li>
+    <li><code class="inline">backend.Dockerfile</code>: how the image is made.</li>
+    <li><code class="inline">azure-pipelines.yml</code>: short, well commented.</li>
+    <li><code class="inline">scripts/deploy.sh</code>, then <code class="inline">scripts/rollout.sh</code>: the best-commented shell in the repo.</li>
+    <li><code class="inline">infra/nginx/nginx-proxy.conf</code>: skim the server blocks, read the comments on the allow-lists.</li>
+    <li><code class="inline">infra/app-vm/README.md</code> and <code class="inline">main.bicep</code>: the VM as a spec.</li>
+    <li><code class="inline">docs/monitoring.md</code>: the checks and the runbooks.</li>
+    <li><code class="inline">docs/WIKI/Architecture.md</code>, <code class="inline">Deployment.md</code>, <code class="inline">Security.md</code>: the engineers' summary, now readable.</li>
+  </ol>
+
+  <h2>Resources, in the order to read them</h2>
+  <h3>Do first</h3>
+  <ul>
+    <li><strong>Docker's "Get started" guide</strong> (docs.docker.com): images, containers, volumes, Compose, in a few hours of hands-on steps.</li>
+    <li><strong>GitHub Actions quickstart</strong> (docs.github.com): one workflow, running in ten minutes.</li>
+    <li><strong>Caddy's "Getting started"</strong> (caddyserver.com): a reverse proxy with HTTPS in three lines.</li>
+    <li><strong>Azure "Create a Linux VM" quickstart</strong>, then the Bicep quickstart for the same VM.</li>
+  </ul>
+  <h3>Worth it after your first deploy</h3>
+  <ul>
+    <li><strong>The Twelve-Factor App</strong> (12factor.net): short, and the reasoning behind "config in the environment, build once".</li>
+    <li><strong>nginx beginner's guide</strong> (nginx.org): server and location blocks, proxy_pass.</li>
+    <li><strong>Google's Site Reliability Engineering book</strong>, free online: the chapters on monitoring distributed systems and on release engineering. Skip the Google-scale parts.</li>
+    <li><strong>Azure Pipelines YAML schema</strong>: when you need to read a stage or deployment job you have not seen.</li>
+  </ul>
+  <h3>Optional</h3>
+  <ul>
+    <li><strong>OpenTelemetry</strong> docs: tracing, once you want to see each agent turn as this project's console does.</li>
+    <li><strong>Kubernetes basics</strong>: only once one VM is not enough. Everything here transfers: images, healthchecks, start-first rollouts, start there by name.</li>
+  </ul>
+
+  <div class="box idea">
+    <span class="label">The one idea to keep</span>
+    <p>Every piece of this platform exists because of a specific thing that went wrong or would have. The backup, the folder ownership, the self-test gate, the canary, the default-deny edge, the fail-closed warehouse client. You do not need any of them on day one. You need the one-line deploy, HTTPS, a health check and an email when it dies, and then the habit of adding the next piece the day you feel its reason.</p>
+  </div>
+</section>
+  </div><!-- /inner -->
+  </main>
+  <div class="scrim" id="scrim"></div>
+</div>
+
+<script>
+(function () {
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section.sec'));
+  var ids = sections.map(function (s) { return s.id; });
+  var tocItems = Array.prototype.slice.call(document.querySelectorAll('#toc li[data-sec]'));
+  var side = document.getElementById('side');
+  var scrim = document.getElementById('scrim');
+  var menuBtn = document.getElementById('menuBtn');
+  var themeBtn = document.getElementById('themeBtn');
+  var progressBar = document.getElementById('progressBar');
+  var progressLabel = document.getElementById('progressLabel');
+  var DONE_KEY = 'mlops-guide-done';
+  var THEME_KEY = 'mlops-guide-theme';
+
+  function loadDone() {
+    try { return JSON.parse(localStorage.getItem(DONE_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveDone(list) {
+    try { localStorage.setItem(DONE_KEY, JSON.stringify(list)); } catch (e) { /* storage unavailable */ }
+  }
+  var done = loadDone();
+
+  function isDone(id) { return done.indexOf(id) !== -1; }
+  function setDone(id, flag) {
+    var i = done.indexOf(id);
+    if (flag && i === -1) done.push(id);
+    if (!flag && i !== -1) done.splice(i, 1);
+    saveDone(done);
+    renderDone();
+  }
+  function renderDone() {
+    tocItems.forEach(function (li) {
+      li.classList.toggle('done', isDone(li.getAttribute('data-sec')));
+    });
+    sections.forEach(function (s) {
+      var cb = s.querySelector('.done-toggle input');
+      if (cb) cb.checked = isDone(s.id);
+    });
+    var pct = ids.length ? Math.round(100 * done.filter(function (d) { return ids.indexOf(d) !== -1; }).length / ids.length) : 0;
+    progressBar.style.width = pct + '%';
+    progressLabel.textContent = done.filter(function (d) { return ids.indexOf(d) !== -1; }).length + ' / ' + ids.length + ' done';
+  }
+
+  // Build a footer (done toggle + prev/next) for every section
+  sections.forEach(function (s, i) {
+    var foot = document.createElement('div');
+    foot.className = 'sec-foot';
+    var label = document.createElement('label');
+    label.className = 'done-toggle';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.addEventListener('change', function () { setDone(s.id, cb.checked); });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' Mark section as done'));
+    foot.appendChild(label);
+    var spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    foot.appendChild(spacer);
+    if (i > 0) {
+      var prev = document.createElement('a');
+      prev.className = 'nav-btn';
+      prev.href = '#' + sections[i - 1].id;
+      prev.textContent = '← ' + sections[i - 1].getAttribute('data-title');
+      foot.appendChild(prev);
+    }
+    if (i < sections.length - 1) {
+      var next = document.createElement('a');
+      next.className = 'nav-btn primary';
+      next.href = '#' + sections[i + 1].id;
+      next.textContent = sections[i + 1].getAttribute('data-title') + ' →';
+      foot.appendChild(next);
+    }
+    s.appendChild(foot);
+  });
+
+  var activeId = ids[0];
+
+  function show(id, opts) {
+    if (ids.indexOf(id) === -1) id = ids[0];
+    activeId = id;
+    sections.forEach(function (s) { s.classList.toggle('active', s.id === id); });
+    tocItems.forEach(function (li) {
+      var a = li.querySelector('a');
+      var active = li.getAttribute('data-sec') === id;
+      a.classList.toggle('active', active);
+      if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    var title = document.getElementById(id).getAttribute('data-title') || id;
+    document.title = title + ' · MLOps Study Guide';
+    if (!(opts && opts.keepScroll)) window.scrollTo(0, 0);
+    closeMenu();
+  }
+
+  function current() {
+    var h = (location.hash || '').replace('#', '');
+    return ids.indexOf(h) !== -1 ? h : ids[0];
+  }
+
+  // go(): update the URL when the environment allows it, then show the section.
+  // Some viewers (sandboxed previews, data: snapshots) block hash changes; the
+  // section still switches because show() does not depend on the URL.
+  function go(id) {
+    if (ids.indexOf(id) === -1) return;
+    try { history.pushState(null, '', '#' + id); } catch (err) { /* ignore */ }
+    show(id);
+  }
+
+  window.addEventListener('hashchange', function () { show(current()); });
+  window.addEventListener('popstate', function () { show(current()); });
+
+  // every in-page link (menu, prev/next, cross-references) goes through go()
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a) return;
+    var id = a.getAttribute('href').slice(1);
+    if (ids.indexOf(id) === -1) return;
+    e.preventDefault();
+    go(id);
+  });
+
+  // keyboard: arrows move between sections (not while typing)
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.altKey || e.ctrlKey || e.metaKey) return;
+    var i = ids.indexOf(activeId);
+    if (e.key === 'ArrowRight' && i < ids.length - 1) go(ids[i + 1]);
+    if (e.key === 'ArrowLeft' && i > 0) go(ids[i - 1]);
+  });
+
+  // mobile menu
+  function openMenu() { side.classList.add('open'); scrim.classList.add('show'); }
+  function closeMenu() { side.classList.remove('open'); scrim.classList.remove('show'); }
+  menuBtn.addEventListener('click', function () { side.classList.contains('open') ? closeMenu() : openMenu(); });
+  scrim.addEventListener('click', closeMenu);
+
+  // theme
+  function applyTheme(t) {
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  var storedTheme = null;
+  try { storedTheme = localStorage.getItem(THEME_KEY); } catch (e) {}
+  applyTheme(storedTheme);
+  themeBtn.addEventListener('click', function () {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = isDark ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  });
+
+  // copy buttons
+  Array.prototype.slice.call(document.querySelectorAll('.prompt .copy')).forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var pre = btn.parentNode.querySelector('pre');
+      var text = pre ? pre.textContent : '';
+      function ok() { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1400); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok, function () { fallback(); });
+      } else { fallback(); }
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); ok(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+
+  renderDone();
+  show(current(), { keepScroll: true });
+})();
+</script>
+</body>
+</html>
